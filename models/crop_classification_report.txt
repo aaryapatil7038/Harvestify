@@ -1,0 +1,36 @@
+              precision    recall  f1-score   support
+
+       bajra       0.98      0.97      0.98       120
+      banana       1.00      1.00      1.00       120
+   blackgram       0.58      0.52      0.55       120
+     brinjal       0.95      0.91      0.93       120
+     cabbage       0.97      0.95      0.96       120
+       chili       0.81      0.79      0.80       120
+      cotton       1.00      1.00      1.00       120
+      cowpea       0.73      0.68      0.70       120
+      ginger       1.00      1.00      1.00       120
+        gram       0.80      0.82      0.81       120
+      grapes       1.00      1.00      1.00       120
+   groundnut       0.95      0.97      0.96       120
+       jowar       0.97      0.96      0.96       120
+      lentil       0.82      0.79      0.81       120
+       maize       1.00      1.00      1.00       120
+    mungbean       0.73      0.87      0.79       120
+       onion       0.64      0.66      0.65       120
+      orange       0.86      0.89      0.87       120
+ pomegranate       0.98      0.99      0.98       120
+      potato       0.95      0.97      0.96       120
+        ragi       1.00      1.00      1.00       120
+        rice       1.00      1.00      1.00       120
+      sesame       0.90      0.86      0.88       120
+     soybean       1.00      1.00      1.00       120
+   sugarcane       1.00      1.00      1.00       120
+   sunflower       0.97      0.97      0.97       120
+      tomato       0.66      0.64      0.65       120
+         tur       0.86      0.89      0.87       120
+    turmeric       1.00      1.00      1.00       120
+       wheat       1.00      1.00      1.00       120
+
+    accuracy                           0.90      3600
+   macro avg       0.90      0.90      0.90      3600
+weighted avg       0.90      0.90      0.90      3600

@@ -1,19 +1,697 @@
-{% extends 'layout.html' %} {% block body %}
+{% extends 'layout.html' %}
+{% block body %}
 
 <style>
-  .mt-0 {
-  margin-top: 50 !important;
-}
+  .result-grid {
+    display: grid;
+    gap: 20px;
+  }
+
+  .metric-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+
+  .weather-grid-clean {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+  }
+
+  .guidance-grid-clean {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+  }
+
+  .result-badge {
+    display: inline-block;
+    padding: 10px 18px;
+    border-radius: 999px;
+    background: #eef6f1;
+    color: var(--primary);
+    font-weight: 700;
+    font-size: 15px;
+    margin-bottom: 10px;
+  }
+
+  .main-result {
+    font-size: 34px;
+    font-weight: 800;
+    color: var(--primary);
+    margin: 0;
+    word-break: break-word;
+  }
+
+  .summary-box-clean {
+    background: #faf8f4;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+    color: var(--text);
+    line-height: 1.7;
+  }
+
+  .top3-item {
+    background: #faf8f4;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 12px;
+  }
+
+  .top3-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+
+  .top3-rank {
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .top3-rank.first {
+    color: var(--primary);
+  }
+
+  .top3-crop {
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .top3-crop.first {
+    color: var(--primary);
+  }
+
+  .top3-confidence {
+    color: var(--muted);
+    font-weight: 700;
+  }
+
+  .confidence-progress {
+    width: 100%;
+    height: 10px;
+    appearance: none;
+    -webkit-appearance: none;
+    border: none;
+    border-radius: 999px;
+    overflow: hidden;
+    background: #e7e2d8;
+  }
+
+  .confidence-progress::-webkit-progress-bar {
+    background: #e7e2d8;
+    border-radius: 999px;
+  }
+
+  .confidence-progress::-webkit-progress-value {
+    background: var(--primary);
+    border-radius: 999px;
+  }
+
+  .confidence-progress::-moz-progress-bar {
+    background: var(--primary);
+    border-radius: 999px;
+  }
+
+  .impact-table-wrap {
+    overflow-x: auto;
+  }
+
+  .clean-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #ffffff;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+
+  .clean-table th,
+  .clean-table td {
+    border-bottom: 1px solid #ece7de;
+    padding: 12px;
+    text-align: center;
+    color: var(--text);
+    font-size: 14px;
+  }
+
+  .clean-table th {
+    background: #f7f4ee;
+    font-weight: 700;
+  }
+
+  .clean-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .xai-line {
+    background: #faf8f4;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 14px;
+    color: var(--text);
+    margin-bottom: 10px;
+    line-height: 1.6;
+  }
+
+  .result-hero-shell {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .result-hero-copy {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .result-download-wrap {
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .result-download-btn {
+    width: 52px;
+    height: 52px;
+    border: 1px solid rgba(47, 123, 87, 0.12);
+    border-radius: 16px;
+    background: #eef6f1;
+    color: var(--primary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 10px 22px rgba(34, 89, 64, 0.08);
+  }
+
+  .result-download-btn:hover {
+    transform: translateY(-2px);
+    background: #e3f0e7;
+    box-shadow: 0 14px 26px rgba(34, 89, 64, 0.12);
+  }
+
+  .result-download-btn:focus-visible {
+    outline: 3px solid rgba(47, 123, 87, 0.18);
+    outline-offset: 2px;
+  }
+
+  .result-download-icon {
+    width: 22px;
+    height: 22px;
+  }
+
+  .result-download-tooltip {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 10px);
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: rgba(8, 12, 18, 0.96);
+    color: #fff;
+    font-size: 0.82rem;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-4px);
+    transition: opacity 0.18s ease, transform 0.18s ease;
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.22);
+  }
+
+  .result-download-wrap:hover .result-download-tooltip,
+  .result-download-btn:focus-visible + .result-download-tooltip {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  @media (max-width: 991px) {
+    .metric-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .weather-grid-clean,
+    .guidance-grid-clean {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .result-hero-shell {
+      align-items: center;
+    }
+
+    .metric-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .main-result {
+      font-size: 28px;
+    }
+
+    .top3-head {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+  }
+
+  @media print {
+    .result-download-wrap {
+      display: none !important;
+    }
+  }
 </style>
 
+<div class="page-wrap">
 
-<div class="container py-2 mx-auto my-50 h-10 " style="margin: 12rem;">
-  <div class="row">
-      <div class="col-sm py-2 py-md-3">
-          <div class="card card-body" style="justify-content: center;">
-               <h1 class="text-center"><b>You should grow <i>{{ prediction }} </i>in your farm</b></h1>
-          </div>
+  <div class="page-hero">
+    <div class="result-hero-shell">
+      <div class="result-hero-copy text-center text-md-left">
+        <div class="result-badge">{% if lang == 'mr' %}पीक शिफारस निकाल{% else %}Crop Recommendation Result{% endif %}</div>
+        <h2>{{ ui.best_crop if ui.best_crop else 'Recommended Crop' }}</h2>
+        <p>{% if lang == 'mr' %}तुमच्या मातीच्या मूल्यांवर, निवडलेल्या स्थानावर आणि हवामानाच्या माहितीनुसार हा निकाल तयार केला आहे.{% else %}Based on your soil values, selected location, and weather conditions.{% endif %}</p>
       </div>
+
+      <div class="result-download-wrap" data-html2canvas-ignore="true">
+        <button
+          type="button"
+          class="result-download-btn"
+          id="downloadResultBtn"
+          aria-label="{% if lang == 'mr' %}डाउनलोड{% else %}Download{% endif %}"
+        >
+          <svg class="result-download-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 3v11"></path>
+            <path d="m7 10 5 5 5-5"></path>
+            <path d="M5 21h14"></path>
+          </svg>
+        </button>
+        <span class="result-download-tooltip">{% if lang == 'mr' %}डाउनलोड{% else %}Download{% endif %}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="result-grid">
+
+    <!-- MAIN PREDICTION -->
+    <div class="section-card text-center">
+      <p class="main-result">🌾 {{ prediction }}</p>
+    </div>
+
+    <!-- CURRENT SEASON -->
+    {% if current_season %}
+    <div class="section-card">
+      <div class="section-title">
+        {% if lang == 'mr' %}
+          सध्याचा हंगाम
+        {% else %}
+          Current Season
+        {% endif %}
+      </div>
+      <div class="summary-box-clean">
+        <b>{{ current_season }}</b><br>
+        {% if lang == 'mr' %}
+          खालील Top 3 पिके या हंगामाचा विचार करून पुन्हा क्रमवारीत लावली आहेत.
+        {% else %}
+          
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- SOWING GUIDANCE -->
+    {% if sowing_guidance %}
+    <div class="section-card">
+      <div class="section-title">{{ ui.sowing_guidance_title }}</div>
+
+      <div class="guidance-grid-clean">
+        <div class="info-box-clean">
+          <h5>{{ ui.best_sowing_window }}</h5>
+          <p>{{ sowing_guidance.sowing_window }}</p>
+        </div>
+
+        <div class="info-box-clean">
+          <h5>{{ ui.transplanting_time }}</h5>
+          <p>{{ sowing_guidance.transplanting_time }}</p>
+        </div>
+
+        <div class="info-box-clean">
+          <h5>{{ ui.harvesting_time }}</h5>
+          <p>{{ sowing_guidance.harvesting_time }}</p>
+        </div>
+
+        <div class="info-box-clean">
+          <h5>{{ ui.crop_duration }}</h5>
+          <p>{{ sowing_guidance.crop_duration }}</p>
+        </div>
+      </div>
+
+      <div class="mini-note mt-3">{{ ui.guidance_note }}</div>
+    </div>
+    {% endif %}
+
+    <!-- WEATHER USED -->
+    {% if weather_city is defined or weather_temperature is defined or weather_humidity is defined or weather_rainfall is defined %}
+    <div class="section-card">
+      <div class="section-title">
+        {% if lang == 'mr' %}
+          भविष्यवाणीसाठी वापरलेली हवामान मूल्ये
+        {% else %}
+          Weather Values Used for Prediction
+        {% endif %}
+      </div>
+
+      <div class="weather-grid-clean">
+        <div class="info-box-clean">
+          <h5>{{ ui.city_location }}</h5>
+          <p>{{ weather_city if weather_city is defined else "--" }}</p>
+        </div>
+
+        <div class="info-box-clean">
+          <h5>{{ ui.latitude }}</h5>
+          <p>{{ weather_latitude if weather_latitude is defined else "--" }}</p>
+        </div>
+
+        <div class="info-box-clean">
+          <h5>{{ ui.longitude }}</h5>
+          <p>{{ weather_longitude if weather_longitude is defined else "--" }}</p>
+        </div>
+
+        <div class="info-box-clean">
+          <h5>{{ ui.temperature }}</h5>
+          <p>
+            {% if weather_temperature is defined %}
+              {{ weather_temperature }} °C
+            {% else %}
+              --
+            {% endif %}
+          </p>
+        </div>
+
+        <div class="info-box-clean">
+          <h5>{{ ui.humidity }}</h5>
+          <p>
+            {% if weather_humidity is defined %}
+              {{ weather_humidity }} %
+            {% else %}
+              --
+            {% endif %}
+          </p>
+        </div>
+
+        <div class="info-box-clean">
+          <h5>{{ ui.rainfall }}</h5>
+          <p>
+            {% if weather_rainfall is defined %}
+              {{ weather_rainfall }} mm
+            {% else %}
+              --
+            {% endif %}
+          </p>
+        </div>
+      </div>
+
+      <div class="mini-note mt-3">
+        {{ ui.weather_source_note if ui.weather_source_note else "Weather values are auto-fetched from your selected farm location." }}
+      </div>
+    </div>
+    {% endif %}
+
+    {% include '_model_info.html' %}
+
+    <!-- OVERALL SUMMARY -->
+    {% if overall_summary %}
+    <div class="section-card">
+      <div class="section-title">{{ ui.overall_summary_title }}</div>
+      <div class="summary-box-clean">
+        {{ overall_summary }}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- YIELD / PROFIT -->
+    {% if estimated_yield is defined and estimated_profit is defined %}
+    <div class="section-card">
+      <div class="section-title">{% if lang == 'mr' %}उत्पादन आणि नफा आढावा{% else %}Yield and Profit Overview{% endif %}</div>
+
+      <div class="metric-grid">
+        <div class="info-box-clean">
+          <h5>{{ ui.land_area }}</h5>
+          <p>{{ land_area }} {{ land_unit_display }}</p>
+        </div>
+
+        <div class="info-box-clean">
+          <h5>{{ ui.estimated_yield }}</h5>
+          <p>{{ estimated_yield }} {{ ui.yield_unit }}</p>
+        </div>
+
+        <div class="info-box-clean">
+          <h5>{{ ui.live_market_price }}</h5>
+          <p>{{ live_modal_price }}</p>
+          <div class="mini-note mt-2">
+            {{ ui.market_name }}: {{ market_name }}<br>
+            {{ ui.price_date }}: {{ price_date }}
+          </div>
+        </div>
+
+        <div class="info-box-clean">
+          <h5>{{ ui.estimated_profit }}</h5>
+          <p>{{ estimated_profit }}</p>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if yield_profit_summary %}
+    <div class="section-card">
+      <div class="summary-box-clean">
+        {{ yield_profit_summary }}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- TOP 3 -->
+    {% if top3_predictions %}
+    <div class="section-card">
+      <div class="section-title">{{ ui.top3 }}</div>
+
+      {% for item in top3_predictions %}
+      <div class="top3-item">
+        <div class="top3-head">
+          <div class="top3-rank {% if loop.index == 1 %}first{% endif %}">
+            #{{ loop.index }}
+          </div>
+
+          <div class="top3-crop {% if loop.index == 1 %}first{% endif %}">
+            {{ item.crop }}
+          </div>
+
+          <div class="top3-confidence">
+            {{ item.confidence }}%
+          </div>
+        </div>
+
+        <progress class="confidence-progress" value="{{ item.confidence }}" max="100"></progress>
+      </div>
+      {% endfor %}
+
+      <div class="summary-box-clean mt-3">
+        <b>{{ ui.relative_confidence_info_title }}</b><br>
+        {{ ui.relative_confidence_info_body }}
+        {% if current_season %}
+        <br><br>
+        <b>
+          {% if lang == 'mr' %}
+            वापरलेला हंगाम:
+          {% else %}
+            Season Used:
+          {% endif %}
+        </b>
+        {{ current_season }}
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- XAI EXPLANATION LINES -->
+    {% if explanations %}
+    <div class="section-card">
+      <div class="section-title">{{ ui.xai_title }}</div>
+
+      {% for line in explanations %}
+      <div class="xai-line">✔ {{ line }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- FEATURE IMPACT TABLE -->
+    {% if explanation is not none %}
+    <div class="section-card">
+      <div class="section-title">{{ ui.impact_title }} {{ prediction }}</div>
+
+      <div class="impact-table-wrap">
+        <table class="clean-table">
+          <tr>
+            <th>{{ ui.feature }}</th>
+            <th>{{ ui.impact_value }}</th>
+            <th>{{ ui.effect }}</th>
+          </tr>
+
+          {% for row in explanation.itertuples() %}
+          <tr>
+            <td>{{ row.Feature }}</td>
+            <td>{{ row[2] }}</td>
+            <td>{{ row.Effect }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+    </div>
+    {% endif %}
+
+    {% include '_prediction_feedback.html' %}
+
   </div>
 </div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+<script>
+  (function () {
+    if ({{ lang|tojson }} !== "mr") {
+      return;
+    }
+
+    const downloadButton = document.getElementById("downloadResultBtn");
+    const downloadTooltip = document.querySelector(".result-download-tooltip");
+
+    if (downloadButton) {
+      downloadButton.setAttribute("aria-label", "डाउनलोड");
+    }
+
+    if (downloadTooltip) {
+      downloadTooltip.textContent = "डाउनलोड";
+    }
+  })();
+
+  (function () {
+    const canonicalResultUrl = {{ current_result_url|default('', true)|tojson }};
+    if (canonicalResultUrl && window.history && window.history.replaceState) {
+      window.history.replaceState(null, "", canonicalResultUrl);
+    }
+  })();
+
+  (function () {
+    const downloadButton = document.getElementById("downloadResultBtn");
+    const pageWrap = document.querySelector(".page-wrap");
+
+    if (downloadButton) {
+      downloadButton.addEventListener("click", async function () {
+        if (!pageWrap || !window.html2canvas || !window.jspdf || !window.jspdf.jsPDF) {
+          window.print();
+          return;
+        }
+
+        const originalLabel = downloadButton.getAttribute("aria-label") || "Download";
+        downloadButton.disabled = true;
+        downloadButton.style.opacity = "0.7";
+        downloadButton.setAttribute("aria-label", "{% if lang == 'mr' %}PDF तयार होत आहे{% else %}Preparing PDF{% endif %}");
+
+        try {
+          const canvas = await window.html2canvas(pageWrap, {
+            scale: 2,
+            useCORS: true,
+            backgroundColor: "#f5efe4",
+            logging: false
+          });
+
+          const { jsPDF } = window.jspdf;
+          const pdf = new jsPDF("p", "mm", "a4");
+          const pageWidth = pdf.internal.pageSize.getWidth();
+          const pageHeight = pdf.internal.pageSize.getHeight();
+          const imageWidth = pageWidth;
+          const imageHeight = (canvas.height * imageWidth) / canvas.width;
+          const imageData = canvas.toDataURL("image/png");
+
+          let remainingHeight = imageHeight;
+          let yOffset = 0;
+
+          pdf.addImage(imageData, "PNG", 0, yOffset, imageWidth, imageHeight, "", "FAST");
+          remainingHeight -= pageHeight;
+
+          while (remainingHeight > 0) {
+            yOffset -= pageHeight;
+            pdf.addPage();
+            pdf.addImage(imageData, "PNG", 0, yOffset, imageWidth, imageHeight, "", "FAST");
+            remainingHeight -= pageHeight;
+          }
+
+          pdf.save("crop-prediction-report.pdf");
+        } catch (error) {
+          window.print();
+        } finally {
+          downloadButton.disabled = false;
+          downloadButton.style.opacity = "";
+          downloadButton.setAttribute("aria-label", originalLabel);
+        }
+      });
+    }
+  })();
+
+  (function () {
+    const storageKey = "harvestifyRecentPredictionsV1";
+    const predictionSummary = {
+      prediction: {{ prediction|tojson }},
+      predictionRaw: {{ prediction_raw|tojson }},
+      currentSeason: {{ current_season|default("", true)|tojson }},
+      currentSeasonRaw: {{ current_season_raw|default("", true)|tojson }},
+      top3: {{ top3_predictions|tojson }},
+      top3Raw: {{ top3_predictions_raw|tojson }},
+      weatherCity: {{ weather_city|default("", true)|tojson }},
+      estimatedYield: {{ estimated_yield|tojson }},
+      estimatedProfit: {{ estimated_profit|tojson }},
+      viewedAt: new Date().toISOString()
+    };
+
+    const signature = JSON.stringify({
+      prediction: predictionSummary.prediction,
+      currentSeason: predictionSummary.currentSeason,
+      top3: predictionSummary.top3
+    });
+
+    try {
+      const existing = JSON.parse(localStorage.getItem(storageKey) || "[]");
+      const filtered = Array.isArray(existing)
+        ? existing.filter((item) => item && item.signature !== signature)
+        : [];
+
+      filtered.unshift({
+        signature: signature,
+        prediction: predictionSummary.prediction,
+        predictionRaw: predictionSummary.predictionRaw,
+        currentSeason: predictionSummary.currentSeason,
+        currentSeasonRaw: predictionSummary.currentSeasonRaw,
+        top3: predictionSummary.top3,
+        top3Raw: predictionSummary.top3Raw,
+        weatherCity: predictionSummary.weatherCity,
+        estimatedYield: predictionSummary.estimatedYield,
+        estimatedProfit: predictionSummary.estimatedProfit,
+        viewedAt: predictionSummary.viewedAt
+      });
+
+      localStorage.setItem(storageKey, JSON.stringify(filtered.slice(0, 5)));
+    } catch (error) {
+      return;
+    }
+  })();
+</script>
+
 {% endblock %}

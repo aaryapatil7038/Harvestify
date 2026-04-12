@@ -1,17 +1,99 @@
-{% extends 'layout.html' %} {% block body %}
+{% extends 'layout.html' %}
+{% block body %}
 
+<div class="page-wrap">
 
-
-
-
-
-<div class="container py-2 mx-auto my-50 h-10 " style="margin: 9rem;">
-  <div class="row">
-      <div class="col-sm py-2 py-md-3">
-          <div class="card card-body" style="justify-content: center; background-color:blanchedalmond">
-               <p class="text-center" style="color: black; font-size: 20px;">{{ recommendation }}</p>
-          </div>
-      </div>
+  <div class="page-hero text-center">
+    <span class="eyebrow">{% if lang == 'mr' %}शिफारस तयार{% else %}Recommendation Ready{% endif %}</span>
+    <h2>{% if lang == 'mr' %}खत शिफारस{% else %}Fertilizer Recommendation{% endif %}</h2>
+    <p class="mt-2">{% if lang == 'mr' %}तुम्ही दिलेल्या मातीच्या मूल्यांनुसार खालील खत योजना तयार झाली आहे.{% else %}Your submitted soil values produced the following fertilizer schedule.{% endif %}</p>
   </div>
+
+  <div class="result-center-shell">
+    <div class="section-card result-card-emphasis fertilizer-result-card">
+      <span class="result-pill">{% if lang == 'mr' %}पिकानुसार खत योजना{% else %}Crop-Specific Fertilizer Plan{% endif %}</span>
+
+      <div class="fertilizer-result-body">
+        <h4 class="mb-3">{{ plan.crop_name }}</h4>
+        <p>{{ plan.summary }}</p>
+      </div>
+
+      {% include '_model_info.html' %}
+
+      <div class="summary-box-clean text-left mt-4">
+        <div class="section-title mb-2">{% if lang == 'mr' %}माती आणि लक्ष्य मूल्ये{% else %}Soil vs Crop Target{% endif %}</div>
+        <ul class="feature-list compact mb-0">
+          {% for line in plan.status_lines %}
+            <li>{{ line }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <div class="summary-box-clean text-left mt-4">
+        <div class="section-title mb-2">{% if lang == 'mr' %}बेसल डोस{% else %}Basal Dose{% endif %}</div>
+        <ul class="feature-list compact mb-0">
+          {% for line in plan.basal_lines %}
+            <li>{{ line }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <div class="summary-box-clean text-left mt-4">
+        <div class="section-title mb-2">{% if lang == 'mr' %}वाढीच्या टप्प्यावरचा डोस{% else %}Vegetative Stage Dose{% endif %}</div>
+        <ul class="feature-list compact mb-0">
+          {% for line in plan.vegetative_lines %}
+            <li>{{ line }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <div class="summary-box-clean text-left mt-4">
+        <div class="section-title mb-2">{% if lang == 'mr' %}फुलोऱ्याच्या टप्प्यावरचा डोस{% else %}Flowering Stage Dose{% endif %}</div>
+        <ul class="feature-list compact mb-0">
+          {% for line in plan.flowering_lines %}
+            <li>{{ line }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <div class="summary-box-clean text-left mt-4">
+        <div class="section-title mb-2">{% if lang == 'mr' %}प्रति एकर प्रमाण{% else %}Quantity Per Acre{% endif %}</div>
+        <ul class="feature-list compact mb-0">
+          {% for line in plan.quantity_lines %}
+            <li>{{ line }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <div class="summary-box-clean text-left mt-4">
+        <div class="section-title mb-2">{% if lang == 'mr' %}सेंद्रिय पर्याय{% else %}Organic Alternative{% endif %}</div>
+        <ul class="feature-list compact mb-0">
+          {% for line in plan.organic_lines %}
+            <li>{{ line }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <p class="mini-note mt-4">{{ plan.note }}</p>
+
+      {% include '_prediction_feedback.html' %}
+
+      <div class="result-actions">
+        <a class="btn-primary-clean result-action-link" href="{{ url_for('fertilizer_recommendation', lang=lang) }}">{% if lang == 'mr' %}पुन्हा प्रयत्न करा{% else %}Try Another Set{% endif %}</a>
+        <a class="btn-secondary-clean result-action-link" href="{{ url_for('home', lang=lang) }}">{% if lang == 'mr' %}मुख्यपृष्ठावर जा{% else %}Back Home{% endif %}</a>
+      </div>
+    </div>
+  </div>
+
 </div>
+
+<script>
+  (function () {
+    const canonicalResultUrl = {{ current_result_url|default('', true)|tojson }};
+    if (canonicalResultUrl && window.history && window.history.replaceState) {
+      window.history.replaceState(null, "", canonicalResultUrl);
+    }
+  })();
+</script>
+
 {% endblock %}

@@ -1,138 +1,2785 @@
-{% extends 'layout.html' %} {% block body %}
+{% extends "layout.html" %}
+
+{% block body %}
+
+<link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+>
 
 <style>
-  html body {
-    background-color: rgb(206, 206, 228);
-  }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+    :root {
+        --bg: #f7f3ec;
+        --text: #172235;
+        --muted: #6b7280;
+        --green: #2f7b57;
+        --green-dark: #225940;
+        --green-soft: rgba(47, 123, 87, 0.12);
+        --shadow-sm: 0 8px 20px rgba(15, 23, 42, 0.05);
+        --shadow-md: 0 16px 35px rgba(15, 23, 42, 0.07);
+        --shadow-lg: 0 24px 70px rgba(15, 23, 42, 0.09);
+        --radius-xl: 30px;
+        --radius-lg: 22px;
+        --radius-md: 18px;
+        --radius-sm: 14px;
+        --transition: all 0.25s ease;
+        --drawer-top-offset: 108px;
+    --drawer-gap: 0px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    .crop-page {
+        font-family: 'Inter', sans-serif;
+        color: var(--text);
+        padding-left: 86px;
+    }
+
+    .crop-page a { text-decoration: none; color: inherit; }
+    .crop-page button,
+    .crop-page input,
+    .crop-page select { font-family: inherit; }
+
+    .crop-page .container {
+        width: min(1080px, calc(100% - 34px));
+        margin: 0 auto;
+    }
+
+    .hero {
+        position: relative;
+        overflow: hidden;
+        padding: 28px 0 20px;
+    }
+
+    .hero::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+            radial-gradient(circle at top right, rgba(195, 109, 45, 0.10), transparent 24%),
+            radial-gradient(circle at top left, rgba(47, 123, 87, 0.10), transparent 26%),
+            linear-gradient(180deg, rgba(248, 243, 234, 0.82), rgba(248, 243, 234, 0.95));
+        z-index: 0;
+    }
+
+    .hero-inner {
+        position: relative;
+        z-index: 2;
+    }
+
+    .hero-card {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 34px;
+        border-radius: 28px;
+        background: linear-gradient(145deg, rgba(255,255,255,0.92), rgba(251,246,238,0.95));
+        border: 1px solid rgba(24, 48, 40, 0.10);
+        backdrop-filter: blur(16px);
+        box-shadow: var(--shadow-lg);
+        text-align: left;
+    }
+
+    .hero-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 9px 16px;
+        border-radius: 999px;
+        background: rgba(40, 89, 67, 0.10);
+        color: var(--green);
+        font-size: 0.76rem;
+        font-weight: 800;
+        margin-bottom: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+    }
+
+    .hero-title {
+        margin: 0 0 10px;
+        font-size: clamp(2rem, 3vw, 2.6rem);
+        line-height: 1.08;
+        letter-spacing: -0.03em;
+    }
+
+    .hero-text {
+        margin: 0;
+        max-width: 760px;
+        color: #516074;
+        font-size: 1rem;
+        line-height: 1.8;
+    }
+
+    .hero-stats {
+        margin-top: 24px;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+    }
+
+    .hero-stat {
+        padding: 18px;
+        border-radius: 18px;
+        background: rgba(255,255,255,0.80);
+        border: 1px solid rgba(24, 48, 40, 0.08);
+        box-shadow: var(--shadow-sm);
+    }
+
+    .hero-stat small {
+        display: block;
+        color: var(--muted);
+        font-size: 0.85rem;
+        margin-bottom: 6px;
+    }
+
+    .hero-stat strong {
+        font-size: 0.98rem;
+        font-weight: 700;
+    }
+
+    .page-section {
+        padding: 14px 0 70px;
+    }
+
+    .main-card {
+        background: rgba(255,255,255,0.90);
+        border: 1px solid rgba(255,255,255,0.58);
+        border-radius: var(--radius-xl);
+        box-shadow: var(--shadow-md);
+        backdrop-filter: blur(16px);
+        padding: 30px;
+    }
+
+    .section-chip {
+        display: inline-flex;
+        align-items: center;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: var(--green-soft);
+        color: var(--green);
+        font-size: 0.82rem;
+        font-weight: 800;
+        margin-bottom: 12px;
+    }
+
+    .main-title {
+        margin: 0 0 8px;
+        font-size: 1.9rem;
+        line-height: 1.15;
+        letter-spacing: -0.03em;
+    }
+
+    .main-subtitle {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.7;
+        font-size: 0.98rem;
+    }
+
+    .form-section {
+        margin-top: 24px;
+    }
+
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+    }
+
+    .field {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .field label {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #223146;
+    }
+
+    .field input,
+    .field select {
+        width: 100%;
+        height: 58px;
+        padding: 0 18px;
+        border-radius: 16px;
+        border: 1px solid rgba(23,34,53,0.10);
+        background: rgba(255,255,255,0.90);
+        color: var(--text);
+        font-size: 0.98rem;
+        outline: none;
+        transition: var(--transition);
+    }
+
+    .field input::placeholder {
+        color: #9aa4b2;
+    }
+
+    .field input:focus,
+    .field select:focus {
+        border-color: rgba(47,123,87,0.5);
+        box-shadow: 0 0 0 4px rgba(47,123,87,0.11);
+        transform: translateY(-1px);
+    }
+
+    .sub-card {
+        margin-top: 24px;
+        padding: 22px;
+        border-radius: 24px;
+        background: rgba(255,255,255,0.72);
+        border: 1px solid rgba(23,34,53,0.08);
+        box-shadow: var(--shadow-sm);
+    }
+
+    .sub-card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+    }
+
+    .sub-card-header h3 {
+        margin: 0;
+        font-size: 1.24rem;
+        letter-spacing: -0.02em;
+    }
+
+    .sub-card-header span {
+        color: var(--muted);
+        font-size: 0.9rem;
+    }
+
+    .method-toggle {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+        margin-bottom: 16px;
+    }
+
+    .toggle-btn {
+        height: 56px;
+        border-radius: 16px;
+        border: 1px solid rgba(47,123,87,0.24);
+        background: rgba(255,255,255,0.88);
+        font-weight: 700;
+        font-size: 0.96rem;
+        color: #213047;
+        cursor: pointer;
+        transition: var(--transition);
+    }
+
+    .toggle-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: var(--shadow-sm);
+    }
+
+    .toggle-btn.active {
+        background: linear-gradient(135deg, rgba(47,123,87,0.18), rgba(47,123,87,0.08));
+        color: var(--green-dark);
+        box-shadow: inset 0 0 0 1px rgba(47,123,87,0.15);
+    }
+
+    .helper-text {
+        margin: 10px 0 0;
+        color: var(--muted);
+        font-size: 0.92rem;
+        line-height: 1.7;
+    }
+
+    .recent-predictions {
+        margin-top: 24px;
+    }
+
+    .recent-predictions-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 14px;
+        margin-top: 16px;
+    }
+
+    .recent-prediction-card {
+        padding: 18px;
+        border-radius: 20px;
+        background: rgba(255,255,255,0.84);
+        border: 1px solid rgba(23,34,53,0.08);
+        box-shadow: var(--shadow-sm);
+        cursor: pointer;
+        transition: var(--transition);
+    }
+
+    .recent-prediction-card:hover {
+        transform: translateY(-2px);
+        border-color: rgba(47,123,87,0.18);
+        box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
+    }
+
+    .recent-prediction-card:focus-visible {
+        outline: 3px solid rgba(47,123,87,0.18);
+        outline-offset: 2px;
+    }
+
+    .recent-prediction-meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 10px;
+        color: var(--muted);
+        font-size: 0.84rem;
+        flex-wrap: wrap;
+    }
+
+    .recent-prediction-title {
+        margin: 0 0 8px;
+        font-size: 1.15rem;
+        color: var(--green-dark);
+        letter-spacing: -0.02em;
+    }
+
+    .recent-prediction-top3 {
+        margin: 0;
+        color: #314156;
+        font-size: 0.94rem;
+        line-height: 1.7;
+    }
+
+    .recent-prediction-top3 strong {
+        color: var(--text);
+    }
+
+    .recent-prediction-extra {
+        margin-top: 12px;
+        color: var(--muted);
+        font-size: 0.88rem;
+        line-height: 1.6;
+    }
+
+    .recent-prediction-actions {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 14px;
+    }
+
+    .recent-delete-btn {
+        border: 1px solid rgba(23,34,53,0.08);
+        background: rgba(255,255,255,0.96);
+        color: #8a3b2f;
+        border-radius: 12px;
+        padding: 9px 12px;
+        font-size: 0.86rem;
+        font-weight: 700;
+        line-height: 1;
+        cursor: pointer;
+        transition: var(--transition);
+    }
+
+    .recent-delete-btn:hover {
+        background: rgba(201, 67, 43, 0.08);
+        border-color: rgba(201, 67, 43, 0.16);
+        transform: translateY(-1px);
+    }
+
+    .recent-delete-btn:focus-visible {
+        outline: 3px solid rgba(201, 67, 43, 0.16);
+        outline-offset: 2px;
+    }
+
+    .recent-empty {
+        margin-top: 12px;
+        color: var(--muted);
+        font-size: 0.94rem;
+        line-height: 1.7;
+    }
+
+    .map-wrap {
+        margin-top: 16px;
+        border-radius: 20px;
+        overflow: hidden;
+        border: 1px solid rgba(23,34,53,0.08);
+        background: #eef4ee;
+    }
+
+    #farmMap {
+        width: 100%;
+        height: 420px;
+    }
+
+    .location-info-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 18px;
+    }
+
+    .location-info-card {
+        background: rgba(255,255,255,0.84);
+        border: 1px solid rgba(23,34,53,0.08);
+        border-radius: 16px;
+        padding: 16px;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .location-info-card span {
+        display: block;
+        color: var(--muted);
+        font-size: 0.85rem;
+        margin-bottom: 6px;
+    }
+
+    .location-info-card strong {
+        display: block;
+        font-size: 1rem;
+        line-height: 1.5;
+        word-break: break-word;
+    }
+
+    .save-row,
+    .saved-selector-row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 14px;
+        margin-top: 8px;
+    }
+
+    .status-box {
+        display: none;
+        margin-top: 16px;
+        padding: 14px 16px;
+        border-radius: 14px;
+        background: rgba(47,123,87,0.08);
+        border: 1px solid rgba(47,123,87,0.14);
+        color: var(--green-dark);
+        font-size: 0.94rem;
+        font-weight: 600;
+        line-height: 1.6;
+    }
+
+    .offline-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 16px;
+    }
+
+    .offline-card {
+        min-width: 0;
+        padding: 16px;
+        border-radius: 18px;
+        background: rgba(255,255,255,0.78);
+        border: 1px solid rgba(23,34,53,0.08);
+    }
+
+    .offline-card span {
+        display: block;
+        color: var(--muted);
+        font-size: 0.84rem;
+        margin-bottom: 6px;
+    }
+
+    .offline-card strong {
+        display: block;
+        color: var(--text);
+        font-size: 0.98rem;
+        line-height: 1.5;
+        word-break: break-word;
+    }
+
+    .offline-card-wide {
+        grid-column: 1 / -1;
+    }
+
+    .map-fallback {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 140px;
+        padding: 18px;
+        text-align: center;
+        color: var(--muted);
+        background: rgba(255,255,255,0.82);
+        border-top: 1px solid rgba(23,34,53,0.08);
+        line-height: 1.7;
+    }
+
+    .action-row {
+        display: flex;
+        justify-content: center;
+        margin-top: 28px;
+    }
+
+    .primary-btn,
+    .secondary-btn,
+    .drawer-tab {
+        border: none;
+        cursor: pointer;
+        transition: var(--transition);
+    }
+
+    .primary-btn {
+        min-width: 280px;
+        height: 62px;
+        padding: 0 28px;
+        border-radius: 18px;
+        background: linear-gradient(135deg, var(--green), var(--green-dark));
+        color: white;
+        font-weight: 800;
+        font-size: 1rem;
+        box-shadow: 0 18px 36px rgba(47,123,87,0.28);
+    }
+
+    .primary-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 22px 40px rgba(47,123,87,0.34);
+    }
+
+    .secondary-btn {
+        min-width: 132px;
+        height: 58px;
+        padding: 0 18px;
+        border-radius: 16px;
+        background: rgba(47,123,87,0.12);
+        color: var(--green-dark);
+        border: 1px solid rgba(47,123,87,0.14);
+        font-size: 0.95rem;
+        font-weight: 700;
+    }
+
+    .secondary-btn:hover {
+        transform: translateY(-2px);
+        background: rgba(47,123,87,0.16);
+    }
+
+    .drawer-overlay {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        top: calc(var(--drawer-top-offset) - 8px);
+        background: rgba(15, 23, 42, 0.30);
+        backdrop-filter: blur(4px);
+        opacity: 0;
+        visibility: hidden;
+        transition: var(--transition);
+        z-index: 590;
+    }
+
+    .drawer-overlay.show {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    .side-drawer {
+        position: fixed;
+        top: calc(var(--drawer-top-offset) + var(--drawer-gap));
+        left: 0;
+        width: 76px;
+        max-width: min(460px, calc(100vw - 8px));
+        height: calc(100vh - var(--drawer-top-offset) - (var(--drawer-gap) * 1.5));
+        background: rgba(248, 244, 237, 0.96);
+        backdrop-filter: blur(18px);
+        border-right: 1px solid rgba(23,34,53,0.08);
+        border-top: 1px solid rgba(23,34,53,0.08);
+        border-top-right-radius: 28px;
+        box-shadow: 20px 0 50px rgba(15, 23, 42, 0.10);
+        transform: translateX(0);
+        transition: width 0.28s ease, box-shadow 0.28s ease;
+        z-index: 610;
+        display: flex;
+        flex-direction: row;
+        flex-wrap: nowrap;
+        align-items: stretch;
+        overflow: visible;
+    }
+
+    .side-drawer.open {
+        width: min(460px, calc(100vw - 8px));
+    }
+
+    .sidebar-rail {
+        flex: 0 0 76px;
+        width: 76px;
+        min-width: 76px;
+        height: 100%;
+        position: relative;
+        z-index: 3;
+        overflow: visible;
+        border-right: 1px solid rgba(23,34,53,0.08);
+        background: rgba(247, 242, 234, 0.98);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+        padding: 16px 12px;
+    }
+
+    .sidebar-icon-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        width: 100%;
+        align-items: center;
+    }
+
+    .drawer-tab,
+    .drawer-toggle,
+    .drawer-close {
+        position: relative;
+        width: 48px;
+        height: 48px;
+        min-width: 48px;
+        border-radius: 14px;
+        border: none;
+        background: rgba(47,123,87,0.08);
+        color: var(--green-dark);
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: var(--transition);
+    }
+
+    .drawer-tab:hover,
+    .drawer-toggle:hover,
+    .drawer-close:hover {
+        background: rgba(47,123,87,0.14);
+        transform: translateY(-1px);
+    }
+
+    .drawer-toggle {
+        background: linear-gradient(135deg, var(--green), var(--green-dark));
+        color: white;
+        box-shadow: 0 14px 28px rgba(47,123,87,0.22);
+    }
+
+    .drawer-tab.active {
+        background: linear-gradient(135deg, var(--green), var(--green-dark));
+        color: white;
+        box-shadow: 0 12px 24px rgba(47,123,87,0.20);
+    }
+
+    .drawer-icon {
+        width: 22px;
+        height: 22px;
+        display: block;
+    }
+
+    .drawer-label {
+        display: none;
+    }
+
+    .sidebar-panel {
+        flex: 0 0 0;
+        width: 0;
+        max-width: 0;
+        min-width: 0;
+        min-height: 100%;
+        align-self: stretch;
+        background: rgba(251, 248, 243, 0.98);
+        opacity: 0;
+        pointer-events: none;
+        transform: translateX(-10px);
+        transition: opacity 0.22s ease, transform 0.22s ease;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .side-drawer.open .sidebar-panel {
+        flex: 1 1 auto;
+        width: auto;
+        max-width: none;
+        opacity: 1;
+        pointer-events: auto;
+        transform: translateX(0);
+    }
+
+    .sidebar-tooltip {
+        position: absolute;
+        left: calc(100% + 10px);
+        top: 50%;
+        transform: translateY(-50%);
+        padding: 9px 12px;
+        border-radius: 12px;
+        background: rgba(8, 12, 18, 0.96);
+        color: #fff;
+        font-size: 0.85rem;
+        font-weight: 700;
+        line-height: 1;
+        white-space: nowrap;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.18s ease, transform 0.18s ease;
+        box-shadow: 0 12px 26px rgba(0, 0, 0, 0.28);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        z-index: 20;
+    }
+
+    .sidebar-tooltip::before {
+        content: "";
+        position: absolute;
+        left: -5px;
+        top: 50%;
+        width: 10px;
+        height: 10px;
+        background: rgba(8, 12, 18, 0.96);
+        border-left: 1px solid rgba(255, 255, 255, 0.08);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        transform: translateY(-50%) rotate(45deg);
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+        .drawer-tab:hover .sidebar-tooltip,
+        .drawer-toggle:hover .sidebar-tooltip,
+        .drawer-close:hover .sidebar-tooltip {
+            opacity: 1;
+            transform: translateY(-50%) translateX(4px);
+        }
+    }
+
+    .side-drawer.open .sidebar-tooltip {
+        display: none;
+    }
+
+    .drawer-content {
+        flex: 1;
+        width: 100%;
+        min-width: 0;
+        overflow-y: auto;
+        padding: 18px;
+        padding-top: 18px;
+    }
+
+    .sidebar-panel .drawer-close {
+        position: absolute;
+        top: 14px;
+        right: 14px;
+        z-index: 2;
+    }
+
+    .drawer-pane {
+        display: none;
+    }
+
+    .drawer-pane.active {
+        display: block;
+    }
+
+    .drawer-subtitle {
+        margin: 0 0 14px;
+        padding-right: 56px;
+        color: var(--muted);
+        font-size: 0.94rem;
+        line-height: 1.7;
+    }
+
+    .panel-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+    }
+
+    .panel-box {
+        background: rgba(255,255,255,0.84);
+        border: 1px solid rgba(23,34,53,0.08);
+        border-radius: 18px;
+        padding: 16px;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .help-item {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+    }
+
+    .help-number {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--green), var(--green-dark));
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        flex-shrink: 0;
+    }
+
+    .panel-box h4 {
+        margin: 0 0 6px;
+        font-size: 1rem;
+    }
+
+    .panel-box p,
+    .panel-box small {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.7;
+        font-size: 0.92rem;
+    }
+
+    .panel-box ul {
+        margin: 0;
+        padding-left: 18px;
+        color: var(--muted);
+        font-size: 0.92rem;
+        line-height: 1.9;
+    }
+
+    .weather-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+    }
+
+    .weather-metric {
+        padding: 14px;
+        border-radius: 14px;
+        background: rgba(47,123,87,0.05);
+        border: 1px solid rgba(47,123,87,0.08);
+    }
+
+    .weather-metric span {
+        display: block;
+        color: var(--muted);
+        font-size: 0.84rem;
+        margin-bottom: 6px;
+    }
+
+    .weather-metric strong {
+        display: block;
+        color: var(--text);
+        font-size: 0.98rem;
+        word-break: break-word;
+        line-height: 1.5;
+    }
+
+    .weather-wide {
+        grid-column: 1 / -1;
+    }
+
+    .saved-farms-list {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+    }
+
+    .saved-farm-box {
+        background: rgba(255,255,255,0.84);
+        border: 1px solid rgba(23,34,53,0.08);
+        border-radius: 18px;
+        padding: 16px;
+        box-shadow: var(--shadow-sm);
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .saved-farm-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 6px;
+    }
+
+    .saved-farm-actions button {
+        border: none;
+        padding: 10px 14px;
+        border-radius: 12px;
+        background: rgba(47,123,87,0.12);
+        color: var(--green-dark);
+        font-size: 0.9rem;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    .empty-note {
+        color: var(--muted);
+        font-size: 0.94rem;
+        line-height: 1.7;
+    }
+
+    .reveal {
+        opacity: 0;
+        transform: translateY(24px);
+        transition: opacity 0.7s ease, transform 0.7s ease;
+    }
+
+    .reveal.show {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    .i18n-store {
+        display: none;
+    }
+
+    @media (max-width: 900px) {
+        .crop-page {
+            padding-left: 0;
+        }
+
+        .hero-stats,
+        .form-grid,
+        .method-toggle,
+        .save-row,
+        .saved-selector-row,
+        .location-info-grid,
+        .recent-predictions-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .weather-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .offline-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .offline-card-wide {
+            grid-column: auto;
+        }
+
+        .weather-wide {
+            grid-column: auto;
+        }
+
+        #farmMap {
+            height: 320px;
+        }
+
+        .side-drawer {
+            width: 76px;
+            max-width: calc(100vw - 6px);
+            left: 0;
+            border-top-left-radius: 24px;
+            border-top-right-radius: 24px;
+            flex-direction: row;
+            flex-wrap: nowrap;
+            align-items: stretch;
+        }
+
+        .side-drawer.open {
+            width: calc(100vw - 6px);
+            max-width: calc(100vw - 6px);
+        }
+    }
+
+    @media (max-width: 640px) {
+        .crop-page .container {
+            width: min(100% - 22px, 100%);
+        }
+
+        .hero-card,
+        .main-card {
+            padding: 20px;
+        }
+
+        .primary-btn {
+            width: 100%;
+            min-width: unset;
+        }
+
+        .side-drawer {
+            top: var(--drawer-top-offset);
+            height: calc(100vh - var(--drawer-top-offset) - 4px);
+        }
+    }
 </style>
-<!--Form Section-->
-<br /><br />
-<h2 style="text-align: center; margin: 0px; color: black">
-  <b>Find out the most suitable crop to grow in your farm</b>
-</h2>
-<br />
 
-<div
-  style="
-    width: 350px;
-    height: 50rem;
-    margin: 0px auto;
-    color: black;
-    border-radius: 25px;
-    padding: 10px 10px;
-  "
->
-  <form method="POST" action="{{ url_for('crop_prediction') }}">
-    <div class="form-group">
-      <label for="Nitrogen" style="font-size: 17px"><b>Nitrogen</b></label>
-      <input
-        type="number"
-        class="form-control"
-        id="Nitrogen"
-        name="nitrogen"
-        placeholder="Enter the value (example:50)"
-        style="font-weight: bold"
-        required
-      />
-    </div>
-    <div class="form-group">
-      <label for="Phosphorous" style="font-size: 17px"
-        ><b>Phosphorous</b></label
-      >
-      <input
-        type="number"
-        class="form-control"
-        id="Phosphorous"
-        name="phosphorous"
-        placeholder="Enter the value (example:50)"
-        style="font-weight: bold"
-        required
-      />
-    </div>
-
-    <div class="form-group">
-      <label for="Pottasium" style="font-size: 17px"><b>Pottasium</b></label>
-      <input
-        type="number"
-        class="form-control"
-        id="Pottasium"
-        name="pottasium"
-        placeholder="Enter the value (example:50)"
-        style="font-weight: bold"
-        required
-      />
-    </div>
-    <div class="form-group">
-      <label for="ph" style="font-size: 17px"><b>ph level</b></label>
-      <input
-        type="number"
-        step="0.01"
-        class="form-control"
-        id="ph"
-        name="ph"
-        placeholder="Enter the value"
-        style="font-weight: bold"
-        required
-      />
-    </div>
-    <div class="form-group">
-      <label for="Rainfall" style="font-size: 17px"
-        ><b>Rainfall (in mm)</b></label
-      >
-      <input
-        type="number"
-        step="0.01"
-        class="form-control"
-        id="Rainfall"
-        name="rainfall"
-        placeholder="Enter the value"
-        style="font-weight: bold"
-        required
-      />
-    </div>
-    <div class="form-group">
-      <label for="State" style="font-size: 17px"><b>State</b></label>
-      <select
-        onchange="print_city('state', this.selectedIndex);"
-        id="sts"
-        name="stt"
-        class="form-control"
-        style="font-weight: bold; color: black"
-        required
-      ></select>
-      <br />
-      <label for="City" style="font-size: 17px"><b>City</b></label>
-      <select
-        id="state"
-        class="form-control"
-        name="city"
-        style="font-weight: bold; color: black"
-        required
-      ></select>
-      <script language="javascript">
-        print_state("sts");
-      </script>
+<div class="crop-page">
+    <div class="i18n-store" id="i18nStore">
+        <span data-key="weatherFetchSuccess">{% if lang == 'mr' %}हवामानाची माहिती यशस्वीरीत्या मिळाली.{% else %}Weather details fetched successfully.{% endif %}</span>
+        <span data-key="weatherFetchLoading">{% if lang == 'mr' %}हवामानाची माहिती मिळवत आहे...{% else %}Fetching weather details...{% endif %}</span>
+        <span data-key="geolocationNotSupported">{% if lang == 'mr' %}या ब्राउझरमध्ये geolocation उपलब्ध नाही.{% else %}Geolocation is not supported in this browser.{% endif %}</span>
+        <span data-key="fetchingCurrentLocation">{% if lang == 'mr' %}सध्याचे स्थान आणि हवामान मिळवत आहे...{% else %}Fetching current location and weather details...{% endif %}</span>
+        <span data-key="currentLocationDenied">{% if lang == 'mr' %}सध्याचे स्थान मिळाले नाही. कृपया location access द्या.{% else %}Current location not received. Please allow location access.{% endif %}</span>
+        <span data-key="manualModeEnabled">{% if lang == 'mr' %}Manual mode सुरू झाले. स्थान टाका किंवा नकाशावर थेट क्लिक करा.{% else %}Manual mode enabled. Enter location or click directly on the map.{% endif %}</span>
+        <span data-key="selectLocationFirst">{% if lang == 'mr' %}कृपया आधी शेताचे स्थान निवडा.{% else %}Please select farm location first.{% endif %}</span>
+        <span data-key="fetchWeatherFirst">{% if lang == 'mr' %}Prediction करण्यापूर्वी हवामानाची माहिती मिळवा.{% else %}Please fetch weather details before prediction.{% endif %}</span>
+        <span data-key="saveFarmBefore">{% if lang == 'mr' %}सेव्ह करण्यापूर्वी शेताचे नाव आणि योग्य स्थान निवडा.{% else %}Enter farm name and select a valid location before saving.{% endif %}</span>
+        <span data-key="farmSaved">{% if lang == 'mr' %}शेत यशस्वीरीत्या सेव्ह झाले.{% else %}Farm saved successfully.{% endif %}</span>
+        <span data-key="farmDeleted">{% if lang == 'mr' %}सेव्ह केलेले शेत हटवले गेले.{% else %}Saved farm deleted.{% endif %}</span>
+        <span data-key="farmLoaded">{% if lang == 'mr' %}सेव्ह केलेले शेत यशस्वीरीत्या लोड झाले.{% else %}Saved farm loaded successfully.{% endif %}</span>
+        <span data-key="noSavedFarms">{% if lang == 'mr' %}अजून कोणतेही शेत सेव्ह केलेले नाही.{% else %}No saved farms yet.{% endif %}</span>
+        <span data-key="pinnedLocation">{% if lang == 'mr' %}सेव्ह केलेले स्थान{% else %}Pinned Location{% endif %}</span>
+        <span data-key="load">{% if lang == 'mr' %}लोड{% else %}Load{% endif %}</span>
+        <span data-key="delete">{% if lang == 'mr' %}डिलीट{% else %}Delete{% endif %}</span>
+        <span data-key="weatherFetchFailed">{% if lang == 'mr' %}या स्थानासाठी हवामानाची माहिती मिळाली नाही.{% else %}Weather data could not be fetched for this location.{% endif %}</span>
+        <span data-key="chooseSavedFarm">{% if lang == 'mr' %}सेव्ह केलेले शेत निवडा{% else %}Choose Saved Farm{% endif %}</span>
+        <span data-key="loadSelectedFarm">{% if lang == 'mr' %}निवडलेले शेत लोड करा{% else %}Load Selected Farm{% endif %}</span>
+        <span data-key="savedFarmSelectorHint">{% if lang == 'mr' %}आधी सेव्ह केलेल्या शेतांपैकी एक निवडा आणि लगेच लोड करा.{% else %}Choose one of your previously saved farms and load it instantly.{% endif %}</span>
+        <span data-key="locationDetails">{% if lang == 'mr' %}निवडलेल्या स्थानाची माहिती{% else %}Selected Location Details{% endif %}</span>
+        <span data-key="locationDetailsHint">{% if lang == 'mr' %}नकाशावर निवडलेल्या शेताचे तपशील{% else %}Details of the farm point selected on the map{% endif %}</span>
+        <span data-key="latitude">{% if lang == 'mr' %}अक्षांश{% else %}Latitude{% endif %}</span>
+        <span data-key="longitude">{% if lang == 'mr' %}रेखांश{% else %}Longitude{% endif %}</span>
+        <span data-key="cityName">{% if lang == 'mr' %}शहर / स्थान{% else %}City / Location{% endif %}</span>
+        <span data-key="selectSavedFarmFirst">{% if lang == 'mr' %}कृपया आधी सेव्ह केलेले शेत निवडा.{% else %}Please select a saved farm first.{% endif %}</span>
+        <span data-key="noSavedFarmOption">{% if lang == 'mr' %}कोणतेही सेव्ह केलेले शेत नाही{% else %}No saved farms available{% endif %}</span>
+        <span data-key="networkOnline">{% if lang == 'mr' %}नेटवर्क उपलब्ध आहे{% else %}Online and ready to sync{% endif %}</span>
+        <span data-key="networkOffline">{% if lang == 'mr' %}तुम्ही सध्या ऑफलाइन आहात{% else %}Offline mode active{% endif %}</span>
+        <span data-key="pendingSyncCount">{% if lang == 'mr' %}सिंकसाठी रांगेत: {count}{% else %}Queued for sync: {count}{% endif %}</span>
+        <span data-key="lastWeatherEmpty">{% if lang == 'mr' %}अजून कोणतीही हवामान माहिती सेव्ह केलेली नाही.{% else %}No weather cached yet.{% endif %}</span>
+        <span data-key="lastWeatherReady">{% if lang == 'mr' %}{city} चे हवामान {time} ला सेव्ह झाले.{% else %}Last weather for {city} saved at {time}.{% endif %}</span>
+        <span data-key="cachedWeatherUsed">{% if lang == 'mr' %}नेटवर्क नसल्यामुळे शेवटची सेव्ह केलेली हवामान माहिती वापरली.{% else %}Using the last saved weather because the network is unavailable.{% endif %}</span>
+        <span data-key="queuedForSync">{% if lang == 'mr' %}फॉर्म ऑफलाइन सेव्ह झाला. इंटरनेट आल्यावर तो आपोआप सिंक होईल.{% else %}Form saved offline. It will sync automatically when the internet returns.{% endif %}</span>
+        <span data-key="syncingQueuedPrediction">{% if lang == 'mr' %}क्यूमध्ये असलेला फॉर्म आता सिंक करत आहोत...{% else %}Syncing your queued prediction now...{% endif %}</span>
+        <span data-key="reconnectedSyncing">{% if lang == 'mr' %}नेटवर्क परत आले. हवामान आणि queued prediction सिंक करत आहोत...{% else %}Connection restored. Refreshing weather and syncing queued prediction...{% endif %}</span>
+        <span data-key="mapOfflineFallback">{% if lang == 'mr' %}नकाशा आत्ता उपलब्ध नाही. खाली स्थान लिहून किंवा सेव्ह केलेले शेत वापरून पुढे जा.{% else %}Map tiles are unavailable right now. You can still type the location below or use a saved farm.{% endif %}</span>
+        <span data-key="draftRestored">{% if lang == 'mr' %}तुमचा शेवटचा फॉर्म draft परत लोड झाला.{% else %}Your last form draft has been restored.{% endif %}</span>
+        <span data-key="offlineWeatherMissing">{% if lang == 'mr' %}ऑफलाइन असताना या ठिकाणासाठी हवामान माहिती मिळाली नाही. एकदा ऑनलाइन जाऊन weather fetch करा.{% else %}No cached weather is available for this location yet. Fetch weather once while online to use it offline later.{% endif %}</span>
     </div>
 
-    <div class="d-flex justify-content-center">
-      <button
-        type="submit"
-        class="btn btn-info"
-        style="
-          color: black;
-          font-weight: bold;
-          width: 130px;
-          height: 50px;
-          border-radius: 12px;
-          font-size: 21px;
-        "
-      >
-        Predict
-      </button>
-    </div>
-  </form>
+    <section class="hero">
+        <div class="container hero-inner">
+            <div class="hero-card reveal">
+                <div class="hero-badge">{% if lang == 'mr' %}अचूक शेती संच{% else %}Precision Farming Suite{% endif %}</div>
+                <h1 class="hero-title">{{ ui.page_title }}</h1>
+                <p class="hero-text">
+                    {% if lang == 'mr' %}
+                        मातीची मूल्ये भरा, शेताचे स्थान निवडा, हवामानाची माहिती आपोआप मिळवा आणि योग्य पीक शिफारस स्वच्छ व आधुनिक पद्धतीने मिळवा.
+                    {% else %}
+                        Enter soil values, choose your farm location, fetch weather automatically,
+                        and get crop recommendation in the same streamlined planning flow as the rest of the app.
+                    {% endif %}
+                </p>
+
+                <div class="hero-stats">
+                    <div class="hero-stat">
+                        <small>{% if lang == 'mr' %}इनपुट{% else %}Inputs{% endif %}</small>
+                        <strong>N, P, K, pH, {{ ui.land_area }}</strong>
+                    </div>
+                    <div class="hero-stat">
+                        <small>{% if lang == 'mr' %}हवामान{% else %}Weather{% endif %}</small>
+                        <strong>{{ ui.temperature }}, {{ ui.humidity }}, {{ ui.rainfall }}</strong>
+                    </div>
+                    <div class="hero-stat">
+                        <small>{% if lang == 'mr' %}आउटपुट{% else %}Output{% endif %}</small>
+                        <strong>{% if lang == 'mr' %}सर्वोत्तम पीक शिफारस{% else %}Best Crop Recommendation{% endif %}</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="page-section">
+        <div class="container">
+            <div class="main-card reveal">
+                <div class="section-chip">{% if lang == 'mr' %}पीक फॉर्म{% else %}Crop Form{% endif %}</div>
+                <h2 class="main-title">{% if lang == 'mr' %}संपूर्ण इनपुट विभाग{% else %}Complete Input Section{% endif %}</h2>
+                <p class="main-subtitle">
+                    {% if lang == 'mr' %}
+                        पीक इनपुट फॉर्म भरा, स्थान पद्धत निवडा, नकाशावर शेताचे अचूक स्थान निवडा, हवामानाची माहिती मिळवा, गरज असल्यास शेत सेव्ह करा आणि नंतर योग्य पीक शोधा.
+                    {% else %}
+                        Fill the crop input form, select the location method, pin your farm on the map,
+                        fetch the weather details, save the farm if needed, and then predict the best crop.
+                    {% endif %}
+                </p>
+
+                <form action="{{ url_for('crop_prediction') }}" method="POST" id="cropForm" class="form-section">
+                    <input type="hidden" name="lang" value="{{ lang }}">
+                    <input type="hidden" name="location_method" id="location_method" value="current">
+                    <input type="hidden" name="latitude" id="latitude">
+                    <input type="hidden" name="longitude" id="longitude">
+                    <input type="hidden" name="weather_city" id="weatherCityInput">
+                    <input type="hidden" name="weather_temperature" id="weatherTemperatureInput">
+                    <input type="hidden" name="weather_humidity" id="weatherHumidityInput">
+                    <input type="hidden" name="rainfall" id="rainfallInput">
+
+                    <div class="form-grid">
+                        <div class="field">
+                            <label for="nitrogen">{{ ui.nitrogen }}</label>
+                            <input type="number" step="any" id="nitrogen" name="nitrogen" placeholder="{{ ui.nitrogen_placeholder }}" required>
+                        </div>
+
+                        <div class="field">
+                            <label for="phosphorous">{{ ui.phosphorous }}</label>
+                            <input type="number" step="any" id="phosphorous" name="phosphorous" placeholder="{{ ui.phosphorous_placeholder }}" required>
+                        </div>
+
+                        <div class="field">
+                            <label for="pottasium">{{ ui.potassium }}</label>
+                            <input type="number" step="any" id="pottasium" name="pottasium" placeholder="{{ ui.potassium_placeholder }}" required>
+                        </div>
+
+                        <div class="field">
+                            <label for="ph">{{ ui.ph_level }}</label>
+                            <input type="number" step="any" id="ph" name="ph" placeholder="{{ ui.enter_value }}" required>
+                        </div>
+
+                        <div class="field">
+                            <label for="land_area">{{ ui.land_area }}</label>
+                            <input type="number" step="any" id="land_area" name="land_area" placeholder="{{ ui.land_area_placeholder }}" required>
+                        </div>
+
+                        <div class="field">
+                            <label for="land_unit">{{ ui.land_unit }}</label>
+                            <select id="land_unit" name="land_unit" required>
+                                <option value="">{{ ui.select_land_unit }}</option>
+                                <option value="acre">{{ ui.acre }}</option>
+                                <option value="hectare">{{ ui.hectare }}</option>
+                            </select>
+                        </div>
+
+                        <div class="field">
+                            <label for="water_source">{{ ui.water_source }}</label>
+                            <select id="water_source" name="water_source" required>
+                                <option value="">{{ ui.select_water_source }}</option>
+                                {% for option in water_source_options %}
+                                    <option value="{{ option }}">{{ ui[option] }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="field">
+                            <label for="water_availability">{{ ui.water_availability }}</label>
+                            <select id="water_availability" name="water_availability" required>
+                                <option value="">{{ ui.select_water_availability }}</option>
+                                {% for option in water_availability_options %}
+                                    <option value="{{ option }}">{{ ui[option] }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="sub-card">
+                        <div class="sub-card-header">
+                            <h3>{{ ui.location_method }}</h3>
+                            <span>{% if lang == 'mr' %}शेताचे स्थान कसे निवडायचे ते ठरवा{% else %}Select how you want to set the farm location{% endif %}</span>
+                        </div>
+
+                        <div class="method-toggle">
+                            <button type="button" class="toggle-btn active" id="currentLocationBtn">{{ ui.use_current_location }}</button>
+                            <button type="button" class="toggle-btn" id="manualLocationBtn">{{ ui.enter_location_manually }}</button>
+                        </div>
+
+                        <div class="field">
+                            <label for="manual_location">{{ ui.enter_farm_location }}</label>
+                            <input
+                                type="text"
+                                id="manual_location"
+                                name="manual_location"
+                                placeholder="{{ ui.manual_location_placeholder }}"
+                            >
+                        </div>
+
+                        <p class="helper-text">
+                            {% if lang == 'mr' %}
+                                सध्याचे स्थान वापरा किंवा गाव, शहर किंवा शेताचे स्थान स्वतः टाका. तुम्ही नकाशावर थेट क्लिक करूनही स्थान निवडू शकता.
+                            {% else %}
+                                Use current location or type village, city, or farm location manually.
+                                You can also click directly on the map to pin the exact place.
+                            {% endif %}
+                        </p>
+
+                        <div class="map-wrap">
+                            <div id="farmMap"></div>
+                            <div id="mapFallback" class="map-fallback" hidden>
+                                {% if lang == 'mr' %}
+                                    नकाशा आत्ता उपलब्ध नाही. खाली स्थान लिहा किंवा सेव्ह केलेले शेत लोड करा.
+                                {% else %}
+                                    The map is unavailable right now. Enter the location below or load a saved farm.
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="location-info-grid">
+                            <div class="location-info-card">
+                                <span>{{ ui.city_location }}</span>
+                                <strong id="selectedCityCard">--</strong>
+                            </div>
+                            <div class="location-info-card">
+                                <span>{% if lang == 'mr' %}अक्षांश{% else %}Latitude{% endif %}</span>
+                                <strong id="selectedLatitudeCard">--</strong>
+                            </div>
+                            <div class="location-info-card">
+                                <span>{% if lang == 'mr' %}रेखांश{% else %}Longitude{% endif %}</span>
+                                <strong id="selectedLongitudeCard">--</strong>
+                            </div>
+                        </div>
+
+                        <div class="status-box" id="statusBox"></div>
+                    </div>
+
+                    
+
+                    <div class="sub-card">
+                        <div class="sub-card-header">
+                            <h3>{% if lang == 'mr' %}हे शेत सेव्ह करा{% else %}Save This Farm{% endif %}</h3>
+                            <span>{% if lang == 'mr' %}नंतर पटकन वापरण्यासाठी ब्राउझरमध्ये सेव्ह करा{% else %}Store in browser for quick reuse{% endif %}</span>
+                        </div>
+
+                        <div class="save-row">
+                            <input type="text" id="farmName" placeholder="{% if lang == 'mr' %}शेताचे नाव टाका{% else %}Enter farm name{% endif %}">
+                            <button type="button" id="saveFarmBtn" class="secondary-btn">{% if lang == 'mr' %}सेव्ह करा{% else %}Save Farm{% endif %}</button>
+                        </div>
+
+                        <p class="helper-text">
+                            {% if lang == 'mr' %}
+                                शेताचे नाव, अक्षांश, रेखांश आणि स्थानाची माहिती फक्त या ब्राउझरमध्ये सेव्ह केली जाईल.
+                            {% else %}
+                                Saves farm name, latitude, longitude, and location text in this browser only.
+                            {% endif %}
+                        </p>
+                    </div>
+
+                    <div class="action-row">
+                        <button type="submit" class="primary-btn">{{ ui.predict }}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <div class="drawer-overlay" id="drawerOverlay"></div>
+
+    <aside class="side-drawer" id="sideDrawer">
+        <div class="sidebar-rail">
+            <div class="sidebar-icon-stack">
+                <button type="button" class="drawer-tab active" data-pane="historyPane" data-title="{% if lang == 'mr' %}इतिहास{% else %}History{% endif %}" aria-label="{% if lang == 'mr' %}इतिहास{% else %}History{% endif %}">
+                    <svg class="drawer-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M12 8v4l3 2"></path>
+                        <path d="M21 12a9 9 0 1 1-2.64-6.36"></path>
+                        <path d="M21 3v6h-6"></path>
+                    </svg>
+                    <span class="sidebar-tooltip">{% if lang == 'mr' %}इतिहास{% else %}History{% endif %}</span>
+                </button>
+
+                <button type="button" class="drawer-tab" data-pane="savedPane" data-title="{% if lang == 'mr' %}सेव्ह केलेली शेतं{% else %}Saved Farms{% endif %}" aria-label="{% if lang == 'mr' %}सेव्ह{% else %}Saved{% endif %}">
+                    <svg class="drawer-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M4 10.5 12 4l8 6.5"></path>
+                        <path d="M6 9.5V20h12V9.5"></path>
+                        <path d="M10 20v-5h4v5"></path>
+                    </svg>
+                    <span class="sidebar-tooltip">{% if lang == 'mr' %}सेव्ह{% else %}Saved{% endif %}</span>
+                </button>
+
+                <button type="button" class="drawer-tab" data-pane="weatherPane" data-title="{% if lang == 'mr' %}हवामान{% else %}Weather{% endif %}" aria-label="{% if lang == 'mr' %}हवामान{% else %}Weather{% endif %}">
+                    <svg class="drawer-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M6 15.5a4 4 0 1 1 1.18-7.82A5.5 5.5 0 0 1 18 9.5a3.5 3.5 0 1 1 .5 6.97H6"></path>
+                    </svg>
+                    <span class="sidebar-tooltip">{% if lang == 'mr' %}हवामान{% else %}Weather{% endif %}</span>
+                </button>
+
+                <button type="button" class="drawer-tab" data-pane="helpPane" data-title="{% if lang == 'mr' %}मदत{% else %}Help{% endif %}" aria-label="{% if lang == 'mr' %}मदत{% else %}Help{% endif %}">
+                    <svg class="drawer-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="12" cy="12" r="9"></circle>
+                        <path d="M9.75 9.25a2.35 2.35 0 1 1 3.5 2.04c-.92.53-1.25.98-1.25 1.96"></path>
+                        <path d="M12 17h.01"></path>
+                    </svg>
+                    <span class="sidebar-tooltip">{% if lang == 'mr' %}मदत{% else %}Help{% endif %}</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="sidebar-panel">
+            <button class="drawer-close" id="drawerClose" type="button" aria-label="{% if lang == 'mr' %}साइडबार बंद करा{% else %}Close sidebar{% endif %}">
+                <svg class="drawer-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M15 6 9 12l6 6"></path>
+                </svg>
+                <span class="sidebar-tooltip">{% if lang == 'mr' %}साइडबार बंद करा{% else %}Close sidebar{% endif %}</span>
+            </button>
+            <div class="drawer-content">
+            <div
+                class="drawer-pane active"
+                id="historyPane"
+                data-label-season="{% if lang == 'mr' %}हंगाम{% else %}Season{% endif %}"
+                data-label-top3="{% if lang == 'mr' %}Top 3{% else %}Top 3{% endif %}"
+                data-label-location="{% if lang == 'mr' %}स्थान{% else %}Location{% endif %}"
+                data-label-profit="{% if lang == 'mr' %}अंदाजित नफा{% else %}Estimated Profit{% endif %}"
+            >
+                <p class="drawer-subtitle">
+                    {% if lang == 'mr' %}
+                        तुमच्या शेवटच्या काही पीक शिफारसी इथे दिसतील.
+                    {% else %}
+                        Your most recent crop recommendations appear here.
+                    {% endif %}
+                </p>
+
+                <div id="recentPredictionsSection" class="recent-predictions">
+                    <div id="recentPredictionsEmpty" class="recent-empty">
+                        {% if lang == 'mr' %}
+                            अजून कोणतीही पीक शिफारस सेव्ह झालेली नाही.
+                        {% else %}
+                            No recent crop predictions have been saved yet.
+                        {% endif %}
+                    </div>
+
+                    <div id="recentPredictionsList" class="recent-predictions-grid"></div>
+                </div>
+            </div>
+
+            <div class="drawer-pane" id="helpPane">
+                <p class="drawer-subtitle">
+                    {% if lang == 'mr' %}
+                        फॉर्म भरताना ही साइड पॅनेल कधीही वापरता येईल, अगदी collapsible sidebar प्रमाणे.
+                    {% else %}
+                        Use this panel anytime while filling the form, just like a collapsible side history panel.
+                    {% endif %}
+                </p>
+
+                <div class="panel-stack">
+                    <div class="panel-box">
+                        <div class="help-item">
+                            <div class="help-number">1</div>
+                            <div>
+                                <h4>{% if lang == 'mr' %}मातीची मूल्ये भरा{% else %}Enter Soil Values{% endif %}</h4>
+                                <p>
+                                    {% if lang == 'mr' %}
+                                        {{ ui.nitrogen }}, {{ ui.phosphorous }}, {{ ui.potassium }}, {{ ui.ph_level }}, {{ ui.land_area }} आणि {{ ui.land_unit }} काळजीपूर्वक भरा.
+                                    {% else %}
+                                        Fill {{ ui.nitrogen }}, {{ ui.phosphorous }}, {{ ui.potassium }}, {{ ui.ph_level }}, land area, and land unit carefully.
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel-box">
+                        <div class="help-item">
+                            <div class="help-number">2</div>
+                            <div>
+                                <h4>{% if lang == 'mr' %}स्थान पद्धत निवडा{% else %}Choose Location Method{% endif %}</h4>
+                                <p>
+                                    {% if lang == 'mr' %}
+                                        सध्याचे स्थान वापरा किंवा गाव, शहर किंवा शेतासाठी manual mode निवडा.
+                                    {% else %}
+                                        Use current location or switch to manual mode for village, city, or farm-based input.
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel-box">
+                        <div class="help-item">
+                            <div class="help-number">3</div>
+                            <div>
+                                <h4>{% if lang == 'mr' %}शेताचे अचूक स्थान निवडा{% else %}Select Exact Farm Point{% endif %}</h4>
+                                <p>
+                                    {% if lang == 'mr' %}
+                                        हवामानावर आधारित अधिक अचूक शिफारसीसाठी नकाशावर क्लिक करून शेताचे अचूक स्थान निवडा.
+                                    {% else %}
+                                        Click on the map to pin the exact location for better weather-based recommendation.
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel-box">
+                        <div class="help-item">
+                            <div class="help-number">4</div>
+                            <div>
+                                <h4>{% if lang == 'mr' %}हवामान मिळवा आणि पीक शोधा{% else %}Fetch Weather and Predict{% endif %}</h4>
+                                <p>
+                                    {% if lang == 'mr' %}
+                                        हवामानाची माहिती आपोआप भरली जाईल. त्यानंतर योग्य पीक शोधण्यासाठी बटण दाबा.
+                                    {% else %}
+                                        Weather will be filled automatically. Then click Predict to get the recommended crop.
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel-box">
+                        <h4>{% if lang == 'mr' %}स्मार्ट टिप्स{% else %}Smart Tips{% endif %}</h4>
+                        <ul>
+                            <li>{% if lang == 'mr' %}चांगल्या हवामान मूल्यांसाठी शेताचे अचूक स्थान निवडा.{% else %}Use exact farm pin for better weather values.{% endif %}</li>
+                            <li>{% if lang == 'mr' %}prediction करण्यापूर्वी pH नीट तपासा.{% else %}Check pH properly before prediction.{% endif %}</li>
+                            <li>{% if lang == 'mr' %}शेत सेव्ह करा म्हणजे नंतर पटकन लोड करता येईल.{% else %}Save farms so you can load them quickly later.{% endif %}</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="drawer-pane" id="weatherPane">
+                <p class="drawer-subtitle">
+                    {% if lang == 'mr' %}
+                        निवडलेल्या शेताच्या स्थानानुसार हवामानाची माहिती आपोआप मिळते.
+                    {% else %}
+                        Auto-fetched weather details based on selected farm location.
+                    {% endif %}
+                </p>
+
+                <div class="panel-stack">
+                    <div class="panel-box">
+                        <h4>{% if lang == 'mr' %}ऑफलाइन / कमी नेटवर्क मोड{% else %}Offline / Low-Network Mode{% endif %}</h4>
+                        <p>{% if lang == 'mr' %}शेवटचे हवामान आणि सिंकसाठी रांगेतील विनंत्या या ब्राउझरमध्ये जतन होतात.{% else %}Last weather and pending sync requests stay saved in this browser.{% endif %}</p>
+
+                        <div class="offline-grid">
+                            <div class="offline-card">
+                                <span>{% if lang == 'mr' %}नेटवर्क स्थिती{% else %}Network{% endif %}</span>
+                                <strong id="networkStatusLabel">{% if lang == 'mr' %}तपासत आहोत...{% else %}Checking...{% endif %}</strong>
+                            </div>
+
+                            <div class="offline-card">
+                                <span>{% if lang == 'mr' %}सिंकसाठी रांगेत{% else %}Pending Sync{% endif %}</span>
+                                <strong id="queueStatusLabel">--</strong>
+                            </div>
+
+                            <div class="offline-card offline-card-wide">
+                                <span>{% if lang == 'mr' %}शेवटचे जतन केलेले हवामान{% else %}Last Saved Weather{% endif %}</span>
+                                <strong id="weatherCacheStatusLabel">{% if lang == 'mr' %}अजून नाही{% else %}Not saved yet{% endif %}</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel-box">
+                        <h4>{% if lang == 'mr' %}सध्याच्या स्थानाचे हवामान{% else %}Current Location Weather{% endif %}</h4>
+
+                        <div class="weather-grid" style="margin-top:12px;">
+                            <div class="weather-metric">
+                                <span>{{ ui.city_location }}</span>
+                                <strong id="weatherCity">--</strong>
+                            </div>
+
+                            <div class="weather-metric">
+                                <span>{{ ui.coordinates }}</span>
+                                <strong id="weatherCoordinates">--</strong>
+                            </div>
+
+                            <div class="weather-metric">
+                                <span>{{ ui.temperature }}</span>
+                                <strong id="weatherTemperature">--</strong>
+                            </div>
+
+                            <div class="weather-metric">
+                                <span>{{ ui.humidity }}</span>
+                                <strong id="weatherHumidity">--</strong>
+                            </div>
+
+                            <div class="weather-metric weather-wide">
+                                <span>{{ ui.rainfall }}</span>
+                                <strong id="weatherRainfall">--</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel-box">
+                        <h4>{% if lang == 'mr' %}हवामान सूचना{% else %}Weather Note{% endif %}</h4>
+                        <p>{{ ui.weather_source_note }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="drawer-pane" id="savedPane">
+                <p class="drawer-subtitle">
+                    {% if lang == 'mr' %}
+                        अनेक शेतांची माहिती सेव्ह करा आणि गरजेनुसार कधीही लोड करा.
+                    {% else %}
+                        Save multiple farms and load them whenever needed.
+                    {% endif %}
+                </p>
+
+                <div class="saved-farms-list" id="savedFarmList">
+                    <div class="empty-note">{% if lang == 'mr' %}अजून कोणतेही शेत सेव्ह केलेले नाही.{% else %}No saved farms yet.{% endif %}</div>
+                </div>
+            </div>
+        </div>
+        </div>
+    </aside>
 </div>
 
-<!-- Form section -->
+<script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+></script>
+
+<script>
+    function t(key) {
+        const el = document.querySelector('#i18nStore [data-key="' + key + '"]');
+        return el ? el.textContent.trim() : key;
+    }
+
+    function formatMessage(key, replacements) {
+        let message = t(key);
+        const values = replacements || {};
+
+        Object.keys(values).forEach(function (name) {
+            message = message.replace(new RegExp("\\{" + name + "\\}", "g"), values[name]);
+        });
+
+        return message;
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+        const STORAGE_KEYS = {
+            savedFarms: "savedFarms",
+            cropDraft: "harvestifyCropDraftV1",
+            recentPredictions: "harvestifyRecentPredictionsV1",
+            weatherCache: "harvestifyWeatherCacheV1",
+            pendingSubmissions: "harvestifyPendingCropSubmissionsV1"
+        };
+
+        const revealItems = document.querySelectorAll(".reveal");
+
+        const currentBtn = document.getElementById("currentLocationBtn");
+        const manualBtn = document.getElementById("manualLocationBtn");
+        const locationMethodInput = document.getElementById("location_method");
+        const manualLocationInput = document.getElementById("manual_location");
+
+        const latitudeInput = document.getElementById("latitude");
+        const longitudeInput = document.getElementById("longitude");
+        const weatherCityInput = document.getElementById("weatherCityInput");
+        const weatherTemperatureInput = document.getElementById("weatherTemperatureInput");
+        const weatherHumidityInput = document.getElementById("weatherHumidityInput");
+        const rainfallInput = document.getElementById("rainfallInput");
+
+        const statusBox = document.getElementById("statusBox");
+
+        const weatherCity = document.getElementById("weatherCity");
+        const weatherCoordinates = document.getElementById("weatherCoordinates");
+        const weatherTemperature = document.getElementById("weatherTemperature");
+        const weatherHumidity = document.getElementById("weatherHumidity");
+        const weatherRainfall = document.getElementById("weatherRainfall");
+
+        const selectedCityCard = document.getElementById("selectedCityCard");
+        const selectedLatitudeCard = document.getElementById("selectedLatitudeCard");
+        const selectedLongitudeCard = document.getElementById("selectedLongitudeCard");
+
+        const saveFarmBtn = document.getElementById("saveFarmBtn");
+        const savedFarmList = document.getElementById("savedFarmList");
+        const farmNameInput = document.getElementById("farmName");
+        const cropForm = document.getElementById("cropForm");
+        const recentPredictionsSection = document.getElementById("recentPredictionsSection");
+        const recentPredictionsList = document.getElementById("recentPredictionsList");
+        const recentPredictionsEmpty = document.getElementById("recentPredictionsEmpty");
+
+        const savedFarmDropdown = document.getElementById("savedFarmDropdown");
+        const loadSelectedFarmBtn = document.getElementById("loadSelectedFarmBtn");
+
+        const drawerToggle = document.getElementById("drawerToggle");
+        const drawerClose = document.getElementById("drawerClose");
+        const drawerOverlay = document.getElementById("drawerOverlay");
+        const sideDrawer = document.getElementById("sideDrawer");
+        const drawerTabs = Array.from(document.querySelectorAll(".drawer-tab"));
+        const drawerPanes = document.querySelectorAll(".drawer-pane");
+        const topNavbar = document.querySelector(".clean-navbar");
+        const networkStatusLabel = document.getElementById("networkStatusLabel");
+        const queueStatusLabel = document.getElementById("queueStatusLabel");
+        const weatherCacheStatusLabel = document.getElementById("weatherCacheStatusLabel");
+        const mapElement = document.getElementById("farmMap");
+        const mapFallback = document.getElementById("mapFallback");
+        const weatherEndpoint = "{{ url_for('get_weather_data', lang=lang) }}";
+        const cropPredictionEndpoint = cropForm ? cropForm.getAttribute("action") : "{{ url_for('crop_prediction') }}";
+        const currentLang = {{ lang|tojson }};
+        const cropTranslations = {{ crop_translations|tojson }};
+        const seasonTranslations = {{ season_translations|tojson }};
+        const locationTranslations = {
+            "kagal": "कागल",
+            "karad": "कराड",
+            "kolhapur": "कोल्हापूर",
+            "satara": "सातारा",
+            "sangli": "सांगली",
+            "pune": "पुणे",
+            "mumbai": "मुंबई",
+            "nagpur": "नागपूर",
+            "nashik": "नाशिक",
+            "solapur": "सोलापूर",
+            "aurangabad": "औरंगाबाद",
+            "ahilyanagar": "अहिल्यानगर",
+            "jalgaon": "जळगाव",
+            "ratnagiri": "रत्नागिरी",
+            "karjat": "कर्जत",
+            "phaltan": "फलटण",
+            "waduj": "वडूज",
+            "patan": "पाटण",
+            "tasgaon": "तासगाव",
+            "islampur": "इस्लामपूर",
+            "miraj": "मिरज",
+            "koregaon": "कोरेगाव",
+            "rahimatpur": "रहीमतपूर"
+        };
+        let map = null;
+        let marker = null;
+        let syncInProgress = false;
+
+        if ("IntersectionObserver" in window) {
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add("show");
+                    }
+                });
+            }, { threshold: 0.12 });
+
+            revealItems.forEach((item) => observer.observe(item));
+        } else {
+            revealItems.forEach((item) => item.classList.add("show"));
+        }
+
+        function safeReadJSON(key, fallback) {
+            try {
+                const rawValue = localStorage.getItem(key);
+                return rawValue ? JSON.parse(rawValue) : fallback;
+            } catch (error) {
+                return fallback;
+            }
+        }
+
+        function safeWriteJSON(key, value) {
+            localStorage.setItem(key, JSON.stringify(value));
+        }
+
+        function safeRemoveStorageKey(key) {
+            try {
+                localStorage.removeItem(key);
+            } catch (error) {
+                return;
+            }
+        }
+
+        function escapeHtml(value) {
+            return String(value === undefined || value === null ? "" : value)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#39;");
+        }
+
+        function translateCropNameForCurrentLang(cropName) {
+            const normalizedCropName = String(cropName || "").trim();
+
+            if (!normalizedCropName) {
+                return "";
+            }
+
+            if (currentLang !== "mr") {
+                return normalizedCropName;
+            }
+
+            const translatedName = cropTranslations[normalizedCropName.toLowerCase()];
+            return translatedName || normalizedCropName;
+        }
+
+        function translateSeasonNameForCurrentLang(seasonName) {
+            const normalizedSeasonName = String(seasonName || "").trim();
+
+            if (!normalizedSeasonName) {
+                return "";
+            }
+
+            if (currentLang !== "mr") {
+                return normalizedSeasonName;
+            }
+
+            return seasonTranslations[normalizedSeasonName] || normalizedSeasonName;
+        }
+
+        function transliterateWordToMarathi(word) {
+            const normalizedWord = String(word || "").trim().toLowerCase();
+
+            if (!normalizedWord) {
+                return "";
+            }
+
+            if (locationTranslations[normalizedWord]) {
+                return locationTranslations[normalizedWord];
+            }
+
+            const vowelTokens = ["aa", "ai", "au", "ee", "ii", "oo", "uu", "a", "e", "i", "o", "u"];
+            const consonantTokens = ["chh", "kh", "gh", "jh", "th", "dh", "ph", "bh", "sh", "ch", "ny", "ng", "gn", "ts", "tr", "dr", "kr", "pr", "br", "gr", "k", "g", "j", "t", "d", "n", "p", "b", "m", "y", "r", "l", "v", "w", "s", "h", "f", "z", "c", "q", "x"];
+            const independentVowels = {
+                "a": "अ",
+                "aa": "आ",
+                "ai": "ऐ",
+                "au": "औ",
+                "e": "ए",
+                "i": "इ",
+                "ee": "ई",
+                "ii": "ई",
+                "o": "ओ",
+                "u": "उ",
+                "oo": "ऊ",
+                "uu": "ऊ"
+            };
+            const vowelMatras = {
+                "a": "",
+                "aa": "ा",
+                "ai": "ै",
+                "au": "ौ",
+                "e": "े",
+                "i": "ि",
+                "ee": "ी",
+                "ii": "ी",
+                "o": "ो",
+                "u": "ु",
+                "oo": "ू",
+                "uu": "ू"
+            };
+            const consonants = {
+                "chh": "छ",
+                "kh": "ख",
+                "gh": "घ",
+                "jh": "झ",
+                "th": "थ",
+                "dh": "ध",
+                "ph": "फ",
+                "bh": "भ",
+                "sh": "श",
+                "ch": "च",
+                "ny": "ञ",
+                "ng": "ङ",
+                "gn": "ग्न",
+                "ts": "ट्स",
+                "tr": "त्र",
+                "dr": "द्र",
+                "kr": "क्र",
+                "pr": "प्र",
+                "br": "ब्र",
+                "gr": "ग्र",
+                "k": "क",
+                "g": "ग",
+                "j": "ज",
+                "t": "ट",
+                "d": "ड",
+                "n": "न",
+                "p": "प",
+                "b": "ब",
+                "m": "म",
+                "y": "य",
+                "r": "र",
+                "l": "ल",
+                "v": "व",
+                "w": "व",
+                "s": "स",
+                "h": "ह",
+                "f": "फ",
+                "z": "झ",
+                "c": "क",
+                "q": "क",
+                "x": "क्स"
+            };
+
+            function matchToken(input, index, tokens) {
+                return tokens.find((token) => input.slice(index, index + token.length) === token) || "";
+            }
+
+            let output = "";
+            let index = 0;
+
+            while (index < normalizedWord.length) {
+                const currentChar = normalizedWord[index];
+                if (!/[a-z]/.test(currentChar)) {
+                    output += currentChar;
+                    index += 1;
+                    continue;
+                }
+
+                const consonantToken = matchToken(normalizedWord, index, consonantTokens);
+
+                if (consonantToken) {
+                    const consonantLetter = consonants[consonantToken] || consonantToken;
+                    index += consonantToken.length;
+
+                    const vowelToken = matchToken(normalizedWord, index, vowelTokens);
+                    if (vowelToken) {
+                        output += consonantLetter + (vowelMatras[vowelToken] || "");
+                        index += vowelToken.length;
+                    } else {
+                        output += consonantLetter;
+                    }
+
+                    continue;
+                }
+
+                const vowelToken = matchToken(normalizedWord, index, vowelTokens);
+                if (vowelToken) {
+                    output += independentVowels[vowelToken] || vowelToken;
+                    index += vowelToken.length;
+                    continue;
+                }
+
+                output += currentChar;
+                index += 1;
+            }
+
+            return output;
+        }
+
+        function translateLocationTextForCurrentLang(text) {
+            const normalizedText = String(text || "").trim();
+
+            if (!normalizedText || currentLang !== "mr" || /[\u0900-\u097F]/.test(normalizedText)) {
+                return normalizedText;
+            }
+
+            return normalizedText
+                .split(/(\s+|[-,()/]+)/)
+                .map((part) => {
+                    if (!/[A-Za-z]/.test(part)) {
+                        return part;
+                    }
+
+                    const mappedPart = locationTranslations[part.toLowerCase()];
+                    return mappedPart || transliterateWordToMarathi(part);
+                })
+                .join("");
+        }
+
+        function syncDrawerOffset() {
+            const navbarHeight = topNavbar ? Math.ceil(topNavbar.getBoundingClientRect().height) : 94;
+            const offset = Math.max(navbarHeight, 88);
+            document.documentElement.style.setProperty("--drawer-top-offset", offset + "px");
+        }
+
+        function isMobileSidebar() {
+            return window.innerWidth <= 900;
+        }
+
+        function openDrawer() {
+            sideDrawer.classList.add("open");
+            if (drawerOverlay && isMobileSidebar()) {
+                drawerOverlay.classList.add("show");
+            }
+            if (drawerToggle) {
+                drawerToggle.setAttribute("aria-expanded", "true");
+            }
+        }
+
+        function closeDrawer() {
+            sideDrawer.classList.remove("open");
+            if (drawerOverlay) {
+                drawerOverlay.classList.remove("show");
+            }
+            if (drawerToggle) {
+                drawerToggle.setAttribute("aria-expanded", "false");
+            }
+        }
+
+        function setActivePane(targetPane) {
+            drawerTabs.forEach((btn) => btn.classList.remove("active"));
+            drawerPanes.forEach((pane) => pane.classList.remove("active"));
+
+            const activeButton = document.querySelector('.drawer-tab[data-pane="' + targetPane + '"]');
+            const activePane = document.getElementById(targetPane);
+
+            if (activeButton) {
+                activeButton.classList.add("active");
+            }
+
+            if (activePane) {
+                activePane.classList.add("active");
+            }
+        }
+
+        if (drawerToggle) {
+            drawerToggle.setAttribute("aria-expanded", "false");
+            drawerToggle.addEventListener("click", function () {
+                if (sideDrawer.classList.contains("open")) {
+                    closeDrawer();
+                } else {
+                    openDrawer();
+                }
+            });
+        }
+        if (drawerClose) drawerClose.addEventListener("click", closeDrawer);
+        if (drawerOverlay) drawerOverlay.addEventListener("click", closeDrawer);
+        syncDrawerOffset();
+        window.addEventListener("resize", function () {
+            syncDrawerOffset();
+            if (!isMobileSidebar() && drawerOverlay) {
+                drawerOverlay.classList.remove("show");
+            }
+        });
+
+        drawerTabs.forEach((button) => {
+            button.addEventListener("click", function () {
+                const targetPane = this.getAttribute("data-pane");
+                const isSamePaneActive = this.classList.contains("active");
+                const isDrawerOpen = sideDrawer.classList.contains("open");
+
+                if (isDrawerOpen && isSamePaneActive) {
+                    closeDrawer();
+                    return;
+                }
+
+                setActivePane(targetPane);
+                openDrawer();
+            });
+        });
+
+        function setStatus(message, show = true) {
+            statusBox.textContent = message;
+            statusBox.style.display = show ? "block" : "none";
+        }
+
+        function setMethod(method, options) {
+            const config = Object.assign({ clearManualLocation: true }, options || {});
+            locationMethodInput.value = method;
+
+            if (method === "current") {
+                currentBtn.classList.add("active");
+                manualBtn.classList.remove("active");
+                manualLocationInput.disabled = true;
+                if (config.clearManualLocation) {
+                    manualLocationInput.value = "";
+                }
+            } else {
+                manualBtn.classList.add("active");
+                currentBtn.classList.remove("active");
+                manualLocationInput.disabled = false;
+            }
+        }
+
+        function setMapFallbackVisible(visible) {
+            if (mapElement) {
+                mapElement.style.display = visible ? "none" : "block";
+            }
+
+            if (mapFallback) {
+                mapFallback.hidden = !visible;
+            }
+        }
+
+        function initializeMap() {
+            if (!window.L || !mapElement) {
+                setMapFallbackVisible(true);
+                setStatus(t("mapOfflineFallback"));
+                return;
+            }
+
+            setMapFallbackVisible(false);
+            map = L.map("farmMap").setView([17.3094, 74.1868], 7);
+
+            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                maxZoom: 19,
+                attribution: "&copy; OpenStreetMap contributors"
+            }).addTo(map);
+
+            map.on("click", function (e) {
+                const lat = e.latlng.lat;
+                const lon = e.latlng.lng;
+
+                updateMarker(lat, lon);
+
+                fetchWeather({
+                    latitude: lat,
+                    longitude: lon,
+                    manual_location: manualLocationInput.value.trim(),
+                    location_method: locationMethodInput.value
+                });
+            });
+        }
+
+        function normalizeCoordinate(value) {
+            const numberValue = Number(value);
+            return Number.isFinite(numberValue) ? numberValue.toFixed(3) : "";
+        }
+
+        function updateMarker(lat, lon) {
+            const latNum = Number(lat);
+            const lonNum = Number(lon);
+
+            if (!Number.isFinite(latNum) || !Number.isFinite(lonNum)) {
+                return;
+            }
+
+            if (map && window.L) {
+                if (marker) {
+                    marker.setLatLng([latNum, lonNum]);
+                } else {
+                    marker = L.marker([latNum, lonNum]).addTo(map);
+                }
+
+                map.setView([latNum, lonNum], 13);
+            }
+
+            latitudeInput.value = latNum.toFixed(6);
+            longitudeInput.value = lonNum.toFixed(6);
+            clearFetchedWeather();
+            weatherCoordinates.textContent = latNum.toFixed(6) + ", " + lonNum.toFixed(6);
+
+            selectedLatitudeCard.textContent = latNum.toFixed(6);
+            selectedLongitudeCard.textContent = lonNum.toFixed(6);
+            persistDraft();
+        }
+
+        function switchToSavedPane() {
+            setActivePane("savedPane");
+        }
+
+        function buildLocationPayload(source) {
+            const state = source || {};
+
+            return {
+                latitude: (state.latitude !== undefined ? state.latitude : latitudeInput.value || "").toString().trim(),
+                longitude: (state.longitude !== undefined ? state.longitude : longitudeInput.value || "").toString().trim(),
+                manual_location: (state.manual_location !== undefined ? state.manual_location : manualLocationInput.value || "").toString().trim(),
+                location_method: (state.location_method !== undefined ? state.location_method : locationMethodInput.value || "current").toString().trim()
+            };
+        }
+
+        function buildWeatherCacheKey(payload) {
+            return [
+                payload.location_method || "manual",
+                (payload.manual_location || "").trim().toLowerCase(),
+                normalizeCoordinate(payload.latitude),
+                normalizeCoordinate(payload.longitude)
+            ].join("|");
+        }
+
+        function getWeatherCache() {
+            return safeReadJSON(STORAGE_KEYS.weatherCache, []);
+        }
+
+        function setWeatherCache(cacheEntries) {
+            safeWriteJSON(STORAGE_KEYS.weatherCache, cacheEntries.slice(0, 8));
+        }
+
+        function getLatestWeatherSnapshot() {
+            const snapshots = getWeatherCache();
+            return snapshots.length ? snapshots[0] : null;
+        }
+
+        function saveWeatherSnapshot(payload, data) {
+            const snapshots = getWeatherCache().filter((item) => item.key !== buildWeatherCacheKey(payload));
+            const snapshot = {
+                key: buildWeatherCacheKey(payload),
+                city: data.city || "--",
+                temperature: data.temperature,
+                humidity: data.humidity,
+                rainfall: data.rainfall,
+                latitude: data.latitude,
+                longitude: data.longitude,
+                manual_location: payload.manual_location || "",
+                location_method: payload.location_method || "manual",
+                savedAt: new Date().toISOString()
+            };
+
+            snapshots.unshift(snapshot);
+            setWeatherCache(snapshots);
+        }
+
+        function findCachedWeather(payload) {
+            const snapshots = getWeatherCache();
+            const exactMatch = snapshots.find((item) => item.key === buildWeatherCacheKey(payload));
+
+            if (exactMatch) {
+                return exactMatch;
+            }
+
+            if (payload.manual_location) {
+                const manualName = payload.manual_location.trim().toLowerCase();
+                const manualMatch = snapshots.find((item) => (item.manual_location || "").trim().toLowerCase() === manualName);
+
+                if (manualMatch) {
+                    return manualMatch;
+                }
+            }
+
+            if (payload.latitude && payload.longitude) {
+                const latKey = normalizeCoordinate(payload.latitude);
+                const lonKey = normalizeCoordinate(payload.longitude);
+                const coordinateMatch = snapshots.find((item) =>
+                    normalizeCoordinate(item.latitude) === latKey && normalizeCoordinate(item.longitude) === lonKey
+                );
+
+                if (coordinateMatch) {
+                    return coordinateMatch;
+                }
+            }
+
+            return null;
+        }
+
+        function updateWeatherUI(data) {
+            const cityText = translateLocationTextForCurrentLang(data.city || "--");
+
+            weatherCity.textContent = cityText;
+            weatherTemperature.textContent = data.temperature !== null && data.temperature !== undefined
+                ? data.temperature + " °C"
+                : "--";
+            weatherHumidity.textContent = data.humidity !== null && data.humidity !== undefined
+                ? data.humidity + " %"
+                : "--";
+            weatherRainfall.textContent = data.rainfall !== null && data.rainfall !== undefined
+                ? data.rainfall + " mm"
+                : "--";
+
+            selectedCityCard.textContent = cityText;
+            weatherCityInput.value = data.city || "";
+            weatherTemperatureInput.value = data.temperature !== null && data.temperature !== undefined ? data.temperature : "";
+            weatherHumidityInput.value = data.humidity !== null && data.humidity !== undefined ? data.humidity : "";
+            rainfallInput.value = data.rainfall !== null && data.rainfall !== undefined ? data.rainfall : "";
+            persistDraft();
+        }
+
+        function clearFetchedWeather() {
+            weatherCity.textContent = "--";
+            weatherTemperature.textContent = "--";
+            weatherHumidity.textContent = "--";
+            weatherRainfall.textContent = "--";
+            selectedCityCard.textContent = "--";
+            weatherCityInput.value = "";
+            weatherTemperatureInput.value = "";
+            weatherHumidityInput.value = "";
+            rainfallInput.value = "";
+        }
+
+        function renderOfflineSummary() {
+            if (networkStatusLabel) {
+                networkStatusLabel.textContent = navigator.onLine ? t("networkOnline") : t("networkOffline");
+            }
+
+            if (queueStatusLabel) {
+                queueStatusLabel.textContent = formatMessage("pendingSyncCount", {
+                    count: getPendingSubmissions().length
+                });
+            }
+
+            if (weatherCacheStatusLabel) {
+                const latestWeather = getLatestWeatherSnapshot();
+                weatherCacheStatusLabel.textContent = latestWeather
+                    ? formatMessage("lastWeatherReady", {
+                        city: translateLocationTextForCurrentLang(latestWeather.city || "--"),
+                        time: new Date(latestWeather.savedAt).toLocaleString()
+                    })
+                    : t("lastWeatherEmpty");
+            }
+        }
+
+        function applyCachedWeather(cachedWeather, statusMessage) {
+            if (!cachedWeather) {
+                return false;
+            }
+
+            if (cachedWeather.latitude && cachedWeather.longitude) {
+                updateMarker(cachedWeather.latitude, cachedWeather.longitude);
+            }
+
+            updateWeatherUI(cachedWeather);
+
+            if (statusMessage) {
+                setStatus(statusMessage);
+            }
+
+            renderOfflineSummary();
+            return true;
+        }
+
+        function fetchWeather(payload, options) {
+            const config = Object.assign({ silent: false }, options || {});
+            const cachedWeather = findCachedWeather(payload);
+
+            if (!navigator.onLine) {
+                if (applyCachedWeather(cachedWeather, t("cachedWeatherUsed"))) {
+                    return Promise.resolve(true);
+                }
+
+                if (!config.silent) {
+                    setStatus(t("offlineWeatherMissing"));
+                }
+
+                return Promise.resolve(false);
+            }
+
+            if (!config.silent) {
+                setStatus(t("weatherFetchLoading"));
+            }
+
+            return fetch(weatherEndpoint, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(payload)
+            })
+            .then((response) => response.json().then((data) => ({ ok: response.ok, data: data })))
+            .then((result) => {
+                const data = result.data || {};
+
+                if (!result.ok || !data.success) {
+                    if (applyCachedWeather(cachedWeather, t("cachedWeatherUsed"))) {
+                        return true;
+                    }
+
+                    if (!config.silent) {
+                        setStatus(data.message || t("weatherFetchFailed"));
+                    }
+
+                    return false;
+                }
+
+                if (data.latitude !== undefined && data.longitude !== undefined) {
+                    updateMarker(data.latitude, data.longitude);
+                }
+
+                updateWeatherUI(data);
+                saveWeatherSnapshot(payload, data);
+
+                if (!config.silent) {
+                    setStatus(t("weatherFetchSuccess"));
+                }
+
+                renderOfflineSummary();
+                return true;
+            })
+            .catch(() => {
+                if (applyCachedWeather(cachedWeather, t("cachedWeatherUsed"))) {
+                    return true;
+                }
+
+                if (!config.silent) {
+                    setStatus(t("weatherFetchFailed"));
+                }
+
+                return false;
+            });
+        }
+
+        function fetchCurrentLocationAndWeather(options) {
+            const config = Object.assign({ silent: false }, options || {});
+
+            if (!navigator.geolocation) {
+                setStatus(t("geolocationNotSupported"));
+                return;
+            }
+
+            if (!config.silent) {
+                setStatus(t("fetchingCurrentLocation"));
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                function (position) {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+
+                    updateMarker(lat, lon);
+
+                    fetchWeather({
+                        latitude: lat,
+                        longitude: lon,
+                        manual_location: "",
+                        location_method: "current"
+                    }, config);
+                },
+                function () {
+                    setStatus(t("currentLocationDenied"));
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 12000
+                }
+            );
+        }
+
+        function getSavedFarms() {
+            return safeReadJSON(STORAGE_KEYS.savedFarms, []);
+        }
+
+        function setSavedFarms(farms) {
+            safeWriteJSON(STORAGE_KEYS.savedFarms, farms);
+        }
+
+        function getRecentPredictions() {
+            return safeReadJSON(STORAGE_KEYS.recentPredictions, []);
+        }
+
+        function setRecentPredictions(predictions) {
+            safeWriteJSON(STORAGE_KEYS.recentPredictions, Array.isArray(predictions) ? predictions.slice(0, 5) : []);
+        }
+
+        function renderRecentPredictions() {
+            if (!recentPredictionsSection || !recentPredictionsList || !recentPredictionsEmpty) {
+                return;
+            }
+
+            const recentPredictions = getRecentPredictions().slice(0, 5);
+            recentPredictionsSection.hidden = false;
+
+            if (!recentPredictions.length) {
+                recentPredictionsList.innerHTML = "";
+                recentPredictionsEmpty.hidden = false;
+                return;
+            }
+
+            const seasonLabel = recentPredictionsSection.dataset.labelSeason || "Season";
+            const top3Label = recentPredictionsSection.dataset.labelTop3 || "Top 3";
+            const locationLabel = recentPredictionsSection.dataset.labelLocation || "Location";
+            const profitLabel = recentPredictionsSection.dataset.labelProfit || "Estimated Profit";
+            const deleteLabel = t("delete");
+
+            recentPredictionsEmpty.hidden = true;
+            recentPredictionsList.innerHTML = recentPredictions.map((item) => {
+                const viewedAt = item.viewedAt ? new Date(item.viewedAt).toLocaleString() : "";
+                const predictionName = translateCropNameForCurrentLang(item.predictionRaw || item.prediction || "--");
+                const seasonName = translateSeasonNameForCurrentLang(item.currentSeasonRaw || item.currentSeason || "--");
+                const top3Entries = Array.isArray(item.top3Raw) && item.top3Raw.length ? item.top3Raw : item.top3;
+                const top3Text = Array.isArray(top3Entries)
+                    ? top3Entries.map((entry, index) => {
+                        const localizedEntry = Array.isArray(item.top3) && item.top3[index]
+                            ? item.top3[index]
+                            : null;
+                        const cropName = escapeHtml(
+                            translateCropNameForCurrentLang(
+                                entry && entry.crop ? entry.crop : (localizedEntry && localizedEntry.crop ? localizedEntry.crop : "--")
+                            )
+                        );
+                        const confidenceValue = entry && entry.confidence !== undefined
+                            ? entry.confidence
+                            : (localizedEntry && localizedEntry.confidence !== undefined ? localizedEntry.confidence : undefined);
+                        const confidence = confidenceValue !== undefined ? escapeHtml(confidenceValue) + "%" : "--";
+                        return cropName + " (" + confidence + ")";
+                    }).join(", ")
+                    : "";
+                const locationLine = item.weatherCity ? "<div>" + locationLabel + ": " + escapeHtml(translateLocationTextForCurrentLang(item.weatherCity)) + "</div>" : "";
+                const profitLine = item.estimatedProfit ? "<div>" + profitLabel + ": " + escapeHtml(item.estimatedProfit) + "</div>" : "";
+                const itemSignature = escapeHtml(item.signature || "");
+
+                return [
+                    '<div class="recent-prediction-card" data-signature="' + itemSignature + '">',
+                    '  <div class="recent-prediction-meta">',
+                    '    <span>' + escapeHtml(viewedAt) + '</span>',
+                    '    <span>' + seasonLabel + ': ' + escapeHtml(seasonName || "--") + '</span>',
+                    '  </div>',
+                    '  <h4 class="recent-prediction-title">' + escapeHtml(predictionName || "--") + '</h4>',
+                    '  <p class="recent-prediction-top3"><strong>' + top3Label + ':</strong> ' + top3Text + '</p>',
+                    '  <div class="recent-prediction-extra">',
+                    locationLine,
+                    profitLine,
+                    '  </div>',
+                    '  <div class="recent-prediction-actions">',
+                    '    <button type="button" class="recent-delete-btn" data-signature="' + itemSignature + '" aria-label="' + deleteLabel + ' ' + escapeHtml(predictionName || "prediction") + '">' + deleteLabel + '</button>',
+                    '  </div>',
+                    '</div>',
+                ].join("");
+            }).join("");
+
+            recentPredictionsList.querySelectorAll(".recent-delete-btn").forEach((button) => {
+                button.addEventListener("click", function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+
+                    const signature = button.getAttribute("data-signature");
+                    const filteredPredictions = getRecentPredictions().filter((item) => item && item.signature !== signature);
+                    setRecentPredictions(filteredPredictions);
+                    renderRecentPredictions();
+                });
+            });
+        }
+
+        function serializeFormFields() {
+            const formData = new FormData(cropForm);
+            const serialized = {};
+
+            formData.forEach((value, key) => {
+                serialized[key] = value;
+            });
+
+            if (!serialized.location_method) {
+                serialized.location_method = locationMethodInput.value;
+            }
+
+            if (!serialized.latitude) {
+                serialized.latitude = latitudeInput.value;
+            }
+
+            if (!serialized.longitude) {
+                serialized.longitude = longitudeInput.value;
+            }
+
+            if (manualLocationInput && !serialized.manual_location) {
+                serialized.manual_location = manualLocationInput.value;
+            }
+
+            return serialized;
+        }
+
+        function persistDraft() {
+            return;
+        }
+
+        function applyFormState(state) {
+            Object.keys(state || {}).forEach((key) => {
+                const field = cropForm.elements.namedItem(key);
+
+                if (field) {
+                    field.value = state[key];
+                }
+            });
+
+            setMethod(state.location_method || "current", { clearManualLocation: false });
+
+            if (manualLocationInput && state.manual_location !== undefined) {
+                manualLocationInput.value = state.manual_location;
+            }
+
+            if (state.latitude && state.longitude) {
+                updateMarker(state.latitude, state.longitude);
+            } else {
+                weatherCoordinates.textContent = "--";
+                selectedLatitudeCard.textContent = "--";
+                selectedLongitudeCard.textContent = "--";
+            }
+
+            if (state.rainfall !== undefined) {
+                rainfallInput.value = state.rainfall;
+            }
+        }
+
+        function restoreDraft() {
+            safeRemoveStorageKey(STORAGE_KEYS.cropDraft);
+            return false;
+        }
+
+        function getPendingSubmissions() {
+            return safeReadJSON(STORAGE_KEYS.pendingSubmissions, []);
+        }
+
+        function setPendingSubmissions(submissions) {
+            safeWriteJSON(STORAGE_KEYS.pendingSubmissions, submissions.slice(0, 5));
+            renderOfflineSummary();
+        }
+
+        function queueCurrentSubmission() {
+            const pending = getPendingSubmissions();
+            pending.push({
+                queuedAt: new Date().toISOString(),
+                fields: serializeFormFields()
+            });
+            setPendingSubmissions(pending);
+        }
+
+        function submitPredictionViaFetch(fields) {
+            const formData = new FormData();
+
+            Object.keys(fields || {}).forEach((key) => {
+                formData.append(key, fields[key]);
+            });
+
+            return fetch(cropPredictionEndpoint, {
+                method: "POST",
+                body: formData,
+                credentials: "same-origin"
+            }).then((response) => {
+                if (!response.ok) {
+                    throw new Error("Prediction sync failed");
+                }
+
+                return response.text();
+            });
+        }
+
+        function syncPendingSubmissions() {
+            if (syncInProgress || !navigator.onLine) {
+                return;
+            }
+
+            const pending = getPendingSubmissions();
+
+            if (!pending.length) {
+                renderOfflineSummary();
+                return;
+            }
+
+            const nextSubmission = pending[0];
+            syncInProgress = true;
+
+            if (nextSubmission && nextSubmission.fields) {
+                applyFormState(nextSubmission.fields);
+            }
+
+            setStatus(t("syncingQueuedPrediction"));
+
+            submitPredictionViaFetch(nextSubmission.fields)
+                .then((html) => {
+                    pending.shift();
+                    setPendingSubmissions(pending);
+                    document.open();
+                    document.write(html);
+                    document.close();
+                })
+                .catch(() => {
+                    syncInProgress = false;
+                    renderOfflineSummary();
+                });
+        }
+
+        function hasResolvableLocation() {
+            const hasCoordinates = latitudeInput.value.trim() && longitudeInput.value.trim();
+            const hasManualLocation = locationMethodInput.value === "manual" && manualLocationInput.value.trim();
+            return Boolean(hasCoordinates || hasManualLocation);
+        }
+
+        function refreshWeatherForCurrentSelection(options) {
+            const payload = buildLocationPayload();
+
+            if (payload.location_method === "current" && !payload.latitude && !payload.longitude) {
+                if (navigator.onLine) {
+                    fetchCurrentLocationAndWeather(options);
+                }
+
+                return;
+            }
+
+            if (payload.manual_location || (payload.latitude && payload.longitude)) {
+                fetchWeather(payload, options);
+            }
+        }
+
+        function populateSavedFarmDropdown() {
+            if (!savedFarmDropdown) return;
+
+            const farms = getSavedFarms();
+            savedFarmDropdown.innerHTML = "";
+
+            if (!farms.length) {
+                const option = document.createElement("option");
+                option.value = "";
+                option.textContent = t("noSavedFarmOption");
+                savedFarmDropdown.appendChild(option);
+                return;
+            }
+
+            const defaultOption = document.createElement("option");
+            defaultOption.value = "";
+            defaultOption.textContent = t("chooseSavedFarm");
+            savedFarmDropdown.appendChild(defaultOption);
+
+            farms.forEach((farm, index) => {
+                const option = document.createElement("option");
+                option.value = index;
+                option.textContent = translateLocationTextForCurrentLang(farm.name || ("Farm " + (index + 1)));
+                savedFarmDropdown.appendChild(option);
+            });
+        }
+
+        function loadFarmByIndex(index) {
+            const farms = getSavedFarms();
+            const farm = farms[index];
+            if (!farm) return;
+
+            setMethod("manual", { clearManualLocation: false });
+            manualLocationInput.value = farm.manual_location || "";
+            updateMarker(farm.latitude, farm.longitude);
+
+            fetchWeather({
+                latitude: farm.latitude,
+                longitude: farm.longitude,
+                manual_location: farm.manual_location || "",
+                location_method: "manual"
+            });
+
+            switchToSavedPane();
+            openDrawer();
+            setStatus(t("farmLoaded"));
+            persistDraft();
+        }
+
+        function renderSavedFarms() {
+            const farms = getSavedFarms();
+            savedFarmList.innerHTML = "";
+
+            if (!farms.length) {
+                savedFarmList.innerHTML = '<div class="empty-note">' + t("noSavedFarms") + '</div>';
+                populateSavedFarmDropdown();
+                return;
+            }
+
+            farms.forEach((farm, index) => {
+                const box = document.createElement("div");
+                box.className = "saved-farm-box";
+
+                box.innerHTML = `
+                    <h4>${translateLocationTextForCurrentLang(farm.name || "Farm")}</h4>
+                    <small>${translateLocationTextForCurrentLang(farm.manual_location || t("pinnedLocation"))}</small>
+                    <small>Lat: ${farm.latitude}</small>
+                    <small>Lon: ${farm.longitude}</small>
+                    <div class="saved-farm-actions">
+                        <button type="button" class="load-btn" data-index="${index}">${t("load")}</button>
+                        <button type="button" class="delete-btn" data-index="${index}">${t("delete")}</button>
+                    </div>
+                `;
+
+                savedFarmList.appendChild(box);
+            });
+
+            savedFarmList.querySelectorAll(".load-btn").forEach((btn) => {
+                btn.addEventListener("click", function () {
+                    loadFarmByIndex(Number(this.getAttribute("data-index")));
+                });
+            });
+
+            savedFarmList.querySelectorAll(".delete-btn").forEach((btn) => {
+                btn.addEventListener("click", function () {
+                    const farms = getSavedFarms();
+                    const index = Number(this.getAttribute("data-index"));
+                    farms.splice(index, 1);
+                    setSavedFarms(farms);
+                    renderSavedFarms();
+                    setStatus(t("farmDeleted"));
+                });
+            });
+
+            populateSavedFarmDropdown();
+        }
+
+        currentBtn.addEventListener("click", function () {
+            setMethod("current");
+            clearFetchedWeather();
+            persistDraft();
+            fetchCurrentLocationAndWeather();
+        });
+
+        manualBtn.addEventListener("click", function () {
+            setMethod("manual");
+            clearFetchedWeather();
+            persistDraft();
+            setStatus(t("manualModeEnabled"));
+        });
+
+        manualLocationInput.addEventListener("change", function () {
+            clearFetchedWeather();
+            persistDraft();
+
+            if (locationMethodInput.value === "manual" && manualLocationInput.value.trim()) {
+                fetchWeather({
+                    latitude: latitudeInput.value,
+                    longitude: longitudeInput.value,
+                    manual_location: manualLocationInput.value.trim(),
+                    location_method: "manual"
+                });
+            }
+        });
+
+        cropForm.querySelectorAll("input, select").forEach((field) => {
+            field.addEventListener("input", persistDraft);
+            field.addEventListener("change", persistDraft);
+        });
+
+        if (saveFarmBtn) {
+            saveFarmBtn.addEventListener("click", function () {
+                const name = farmNameInput.value.trim();
+                const lat = latitudeInput.value.trim();
+                const lon = longitudeInput.value.trim();
+                const manualLocation = manualLocationInput.value.trim();
+
+                if (!name || !lat || !lon) {
+                    setStatus(t("saveFarmBefore"));
+                    return;
+                }
+
+                const farms = getSavedFarms();
+                farms.push({
+                    name: name,
+                    latitude: lat,
+                    longitude: lon,
+                    manual_location: manualLocation
+                });
+
+                setSavedFarms(farms);
+                renderSavedFarms();
+                farmNameInput.value = "";
+                setStatus(t("farmSaved"));
+
+                switchToSavedPane();
+                openDrawer();
+            });
+        }
+
+        if (loadSelectedFarmBtn) {
+            loadSelectedFarmBtn.addEventListener("click", function () {
+                if (!savedFarmDropdown || savedFarmDropdown.value === "") {
+                    setStatus(t("selectSavedFarmFirst"));
+                    return;
+                }
+
+                loadFarmByIndex(Number(savedFarmDropdown.value));
+            });
+        }
+
+        cropForm.addEventListener("submit", function (e) {
+            const payload = buildLocationPayload();
+
+            if (!hasResolvableLocation()) {
+                e.preventDefault();
+                setStatus(t("selectLocationFirst"));
+                return;
+            }
+
+            if (!rainfallInput.value) {
+                const cachedWeather = findCachedWeather(payload);
+
+                if (cachedWeather) {
+                    applyCachedWeather(cachedWeather, t("cachedWeatherUsed"));
+                }
+            }
+
+            if (!navigator.onLine) {
+                e.preventDefault();
+                queueCurrentSubmission();
+                setStatus(t("queuedForSync"));
+                return;
+            }
+
+            if (!rainfallInput.value) {
+                e.preventDefault();
+                setStatus(t("fetchWeatherFirst"));
+            }
+        });
+
+        window.addEventListener("online", function () {
+            renderOfflineSummary();
+            setStatus(t("reconnectedSyncing"));
+            refreshWeatherForCurrentSelection({ silent: true });
+            syncPendingSubmissions();
+        });
+
+        window.addEventListener("offline", function () {
+            renderOfflineSummary();
+            setStatus(t("networkOffline"));
+        });
+
+        initializeMap();
+        setActivePane("historyPane");
+        renderSavedFarms();
+        renderOfflineSummary();
+        renderRecentPredictions();
+
+        safeRemoveStorageKey(STORAGE_KEYS.cropDraft);
+        const restoredDraft = restoreDraft();
+
+        if (restoredDraft) {
+            const restoredWeather = findCachedWeather(buildLocationPayload());
+
+            if (restoredWeather) {
+                applyCachedWeather(restoredWeather);
+            }
+
+            setStatus(t("draftRestored"));
+
+            if (navigator.onLine) {
+                refreshWeatherForCurrentSelection({ silent: true });
+            }
+        } else {
+            setMethod("current");
+            persistDraft();
+
+            if (navigator.onLine) {
+                fetchCurrentLocationAndWeather({ silent: true });
+            } else {
+                setStatus(t("networkOffline"));
+            }
+        }
+
+        if (navigator.onLine) {
+            syncPendingSubmissions();
+        }
+    });
+</script>
 
 {% endblock %}

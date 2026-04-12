@@ -1,0 +1,12 @@
+{% if model_info %}
+<div class="section-card">
+  <div class="section-title">
+    {% if lang == 'mr' %}मॉडेल माहिती{% else %}Model Info{% endif %}
+  </div>
+  <div class="summary-box-clean">
+    <strong>{{ model_info.version_label }}:</strong> {{ model_info.version }}<br>
+    <strong>{{ model_info.last_trained_label }}:</strong> {{ model_info.last_trained }}<br>
+    <strong>{{ model_info.region_label }}:</strong> {{ model_info.region }}
+  </div>
+</div>
+{% endif %}

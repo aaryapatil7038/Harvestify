@@ -1,121 +1,136 @@
-{% extends 'layout.html' %} {% block body %}
+{% extends 'layout.html' %}
+{% block body %}
 
-<style>
-  html body {
-    background-color: rgb(206, 206, 228);
-  }
-</style>
-<!--Form Section-->
-<br /><br />
-<h2 style="text-align: center; margin: 0px; color: black">
-  <b>Get informed advice on fertilizer based on soil</b>
-</h2>
-<br />
+<div class="page-wrap">
 
-<div
-  style="
-    width: 350px;
-    height: 40rem;
-    margin: 0px auto;
-    color: black;
-    border-radius: 25px;
-    padding: 10px 10px;
-  "
->
-  <form method="POST" action="{{ url_for('fert_recommend') }}">
-    <div class="form-group">
-      <label for="Nitrogen" style="font-size: 17px"><b>Nitrogen</b></label>
-      <input
-        type="number"
-        class="form-control"
-        id="Nitrogen"
-        name="nitrogen"
-        placeholder="Enter the value (example:50)"
-        style="font-weight: bold"
-        required
-      />
+  <div class="page-hero split-hero">
+    <div>
+      <span class="eyebrow">{% if lang == 'mr' %}खत नियोजन{% else %}Fertilizer Planner{% endif %}</span>
+      <h2>{{ ui.fertilizer_title }}</h2>
+      <p class="mt-2">
+        {% if lang == 'mr' %}
+          मातीतील घटकांची मूल्ये आणि तुम्हाला घ्यायचे पीक निवडा, म्हणजे योग्य खताचा केंद्रित सल्ला मिळेल.
+        {% else %}
+          Enter soil nutrient values and the crop you want to grow to get a focused fertilizer suggestion.
+        {% endif %}
+      </p>
     </div>
-    <div class="form-group">
-      <label for="Phosphorous" style="font-size: 17px"
-        ><b>Phosphorous</b></label
-      >
-      <input
-        type="number"
-        class="form-control"
-        id="Phosphorous"
-        name="phosphorous"
-        placeholder="Enter the value (example:50)"
-        style="font-weight: bold"
-        required
-      />
+    <div class="hero-aside-card">
+      <span class="mini-kicker">{% if lang == 'mr' %}जलद इनपुट मार्गदर्शक{% else %}Fast Input Guide{% endif %}</span>
+      <p>
+        {% if lang == 'mr' %}
+          सर्वात अचूक सल्ल्यासाठी शेतातील नायट्रोजन, फॉस्फरस आणि पोटॅशियमची ताजी मूल्ये वापरा.
+        {% else %}
+          Use the latest nitrogen, phosphorous, and potassium readings you have for the field to get the most relevant output.
+        {% endif %}
+      </p>
+    </div>
+  </div>
+
+  <div class="content-split">
+    <div class="section-card">
+
+      <form method="POST" action="{{ url_for('fert_recommend') }}">
+        <input type="hidden" name="lang" value="{{ lang }}">
+
+        <div class="clean-form-grid">
+
+          <div class="input-shell">
+            <label class="form-label-clean">{{ ui.nitrogen }}</label>
+            <input type="number" name="nitrogen" class="form-control" placeholder="{% if lang == 'mr' %}उदा. 90{% else %}e.g. 90{% endif %}" required>
+            <p class="mini-note">
+              {% if lang == 'mr' %}
+                माती परीक्षणातील उपलब्ध नायट्रोजनचे मूल्य येथे नोंदवा.
+              {% else %}
+                Record the available nitrogen value from your soil test.
+              {% endif %}
+            </p>
+          </div>
+
+          <div class="input-shell">
+            <label class="form-label-clean">{{ ui.phosphorous }}</label>
+            <input type="number" name="phosphorous" class="form-control" placeholder="{% if lang == 'mr' %}उदा. 42{% else %}e.g. 42{% endif %}" required>
+            <p class="mini-note">
+              {% if lang == 'mr' %}
+                त्याच शेत नमुन्याचे फॉस्फरस मूल्य येथे भरा.
+              {% else %}
+                Enter the phosphorous reading for the same field sample.
+              {% endif %}
+            </p>
+          </div>
+
+          <div class="input-shell">
+            <label class="form-label-clean">{{ ui.potassium }}</label>
+            <input type="number" name="pottasium" class="form-control" placeholder="{% if lang == 'mr' %}उदा. 58{% else %}e.g. 58{% endif %}" required>
+            <p class="mini-note">
+              {% if lang == 'mr' %}
+                पीक निवडण्यापूर्वी पोटॅशियमचे मूल्य जोडा.
+              {% else %}
+                Add the potassium value before choosing the crop.
+              {% endif %}
+            </p>
+          </div>
+
+          <div class="full-span input-shell">
+            <label class="form-label-clean">{{ ui.crop_you_want_to_grow }}</label>
+
+            <select name="cropname" class="form-control" required>
+              <option disabled selected>{{ ui.select_crop }}</option>
+              {% for crop_option in crop_options %}
+                <option value="{{ crop_option }}">
+                  {% if lang == 'mr' %}
+                    {{ crop_translations.get(crop_option, crop_option) }}
+                  {% else %}
+                    {{ crop_option|title }}
+                  {% endif %}
+                </option>
+              {% endfor %}
+            </select>
+            <p class="mini-note">
+              {% if lang == 'mr' %}
+                शिफारस पीकानुसार अचूक राहावी म्हणून तुम्ही घेऊ इच्छित असलेले पीक निवडा.
+              {% else %}
+                Pick the crop you plan to grow so the recommendation stays crop-specific.
+              {% endif %}
+            </p>
+          </div>
+
+          <div class="full-span">
+            <button type="submit" class="btn-success-clean">
+              {{ ui.predict }}
+            </button>
+          </div>
+
+        </div>
+      </form>
+
     </div>
 
-    <div class="form-group">
-      <label for="Pottasium" style="font-size: 17px"><b>Pottasium</b></label>
-      <input
-        type="number"
-        class="form-control"
-        id="Pottasium"
-        name="pottasium"
-        placeholder="Enter the value (example:50)"
-        style="font-weight: bold"
-        required
-      />
-    </div>
-    <div class="form-group">
-      <label for="crop" style="font-size: 17px"
-        ><b>Crop you want to grow</b></label
-      >
-      <select
-        name="cropname"
-        class="form-control"
-        id="crop"
-        placeholder="Select a crop"
-        style="font-weight: bold"
-        required
-      >
-        <option selected>Select crop</option>
-        <option>rice</option>
-        <option>maize</option>
-        <option>chickpea</option>
-        <option>kidneybeans</option>
-        <option>pigeonpeas</option>
-        <option>mothbeans</option>
-        <option>mungbean</option>
-        <option>blackgram</option>
-        <option>lentil</option>
-        <option>pomegranate</option>
-        <option>banana</option>
-        <option>mango</option>
-        <option>grapes</option>
-        <option>watermelon</option>
-        <option>muskmelon</option>
-        <option>apple</option>
-        <option>orange</option>
-        <option>papaya</option>
-        <option>coconut</option>
-        <option>cotton</option>
-        <option>jute</option>
-        <option>coffee</option>
-      </select>
-    </div>
+    <aside class="side-panel-stack">
+      <div class="section-card side-panel-card">
+        <span class="mini-kicker">{% if lang == 'mr' %}याचा उपयोग{% else %}Why this helps{% endif %}</span>
+        <h4 class="section-title">{% if lang == 'mr' %}खताविषयी जलद निर्णय{% else %}Quicker fertilizer decisions{% endif %}</h4>
+        <p class="section-note">
+          {% if lang == 'mr' %}
+            हा फॉर्म लहान आणि सरळ ठेवला आहे, त्यामुळे माती परीक्षणातील मूल्यांपासून उपयोगी खत सल्ल्यापर्यंत तुम्ही पटकन पोहोचू शकता.
+          {% else %}
+            This form keeps the workflow small and direct so you can move from soil test values to a usable suggestion without digging through extra screens.
+          {% endif %}
+        </p>
+      </div>
 
-    <div class="d-flex justify-content-center">
-      <button
-        type="submit"
-        class="btn btn-info"
-        style="
-          color: black;
-          font-weight: bold;
-          width: 130px;
-          height: 50px;
-          border-radius: 12px;
-          font-size: 21px;
-        "
-      >
-        Predict
-      </button>
-    </div>
-  </form>
+      <div class="section-card side-panel-card">
+        <span class="mini-kicker">{% if lang == 'mr' %}सबमिट करण्यापूर्वी{% else %}Before you submit{% endif %}</span>
+        <ul class="feature-list compact">
+          <li>{% if lang == 'mr' %}त्याच माती नमुना अहवालातील मूल्ये वापरा.{% else %}Use values from the same soil sample report.{% endif %}</li>
+          <li>{% if lang == 'mr' %}शोधण्यापूर्वी युनिट्स आणि टायपिंग पुन्हा तपासा.{% else %}Double-check units and typing before predicting.{% endif %}</li>
+          <li>{% if lang == 'mr' %}तुमच्या सध्याच्या लागवड योजनेशी जुळणारे पीक निवडा.{% else %}Choose the crop that matches your current planting plan.{% endif %}</li>
+        </ul>
+      </div>
+    </aside>
+
+  </div>
+
 </div>
+
 {% endblock %}

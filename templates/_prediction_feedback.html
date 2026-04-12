@@ -1,0 +1,175 @@
+{% if feedback_status %}
+<div class="section-card mt-4">
+  <div class="section-title">
+    {% if lang == 'mr' %}अभिप्राय नोंदवला गेला{% else %}Feedback Saved{% endif %}
+  </div>
+  <div class="summary-box-clean">
+    {% if lang == 'mr' %}
+      तुमचा अभिप्राय जतन केला आहे. यामुळे पुढील शिफारसी अधिक उपयोगी बनवता येतील.
+    {% else %}
+      Your feedback was saved. This helps us improve future recommendations without interrupting every prediction.
+    {% endif %}
+  </div>
+</div>
+{% elif show_feedback_prompt %}
+<style>
+  .feedback-popup-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(24, 33, 28, 0.38);
+    backdrop-filter: blur(6px);
+  }
+
+  .feedback-popup-shell {
+    position: relative;
+    width: min(760px, 100%);
+    max-height: calc(100vh - 48px);
+    overflow-y: auto;
+  }
+
+  .feedback-popup-card {
+    margin: 0;
+    box-shadow: 0 30px 60px rgba(20, 40, 30, 0.18);
+  }
+
+  .feedback-popup-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 40px;
+    height: 40px;
+    border: 1px solid rgba(47, 123, 87, 0.14);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.92);
+    color: var(--text);
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .feedback-popup-close:hover {
+    background: #ffffff;
+  }
+
+  .feedback-popup-body {
+    padding-top: 8px;
+  }
+
+  @media (max-width: 768px) {
+    .feedback-popup-backdrop {
+      padding: 14px;
+      align-items: flex-start;
+    }
+
+    .feedback-popup-shell {
+      max-height: calc(100vh - 28px);
+    }
+  }
+</style>
+
+<div class="feedback-popup-backdrop" id="feedbackPopupBackdrop">
+  <div class="feedback-popup-shell">
+    <div class="section-card feedback-popup-card">
+      <button
+        class="feedback-popup-close"
+        id="feedbackPopupClose"
+        type="button"
+        aria-label="{% if lang == 'mr' %}बंद करा{% else %}Close popup{% endif %}"
+      >&times;</button>
+
+      <div class="feedback-popup-body">
+        <div class="section-title">
+          {% if lang == 'mr' %}जलद अभिप्राय{% else %}Quick Feedback{% endif %}
+        </div>
+        <p class="mini-note mb-3">
+          {% if lang == 'mr' %}
+            
+          {% else %}
+            
+          {% endif %}
+        </p>
+
+        <form method="post" action="{{ url_for('prediction_feedback', lang=lang) }}">
+          <input type="hidden" name="prediction_type" value="{{ feedback_prediction_type }}">
+          <input type="hidden" name="prediction_name" value="{{ feedback_prediction_name }}">
+          <input type="hidden" name="prediction_count" value="{{ feedback_prediction_count }}">
+          <input type="hidden" name="return_path" value="{{ current_result_url }}">
+
+          <div class="form-group">
+            <label for="feedback-usefulness">
+              {% if lang == 'mr' %}हा निकाल उपयोगी होता का?{% else %}Was this prediction useful?{% endif %}
+            </label>
+            <select class="form-control" id="feedback-usefulness" name="usefulness">
+              <option value="">
+                {% if lang == 'mr' %}पर्याय निवडा{% else %}Choose an option{% endif %}
+              </option>
+              <option value="useful">
+                {% if lang == 'mr' %}उपयोगी{% else %}Useful{% endif %}
+              </option>
+              <option value="not_useful">
+                {% if lang == 'mr' %}उपयोगी नाही{% else %}Not useful{% endif %}
+              </option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="feedback-chosen-crop">
+              {% if lang == 'mr' %}प्रत्यक्षात कोणते पीक निवडले?{% else %}Which crop did you actually choose?{% endif %}
+            </label>
+            <input
+              class="form-control"
+              id="feedback-chosen-crop"
+              name="chosen_crop"
+              maxlength="80"
+              placeholder="{% if lang == 'mr' %}उदा. सोयाबीन{% else %}Example: soybean{% endif %}"
+              type="text"
+            >
+          </div>
+
+          <div class="form-group mb-3">
+            <label for="feedback-season-result">
+              {% if lang == 'mr' %}हंगामानंतर काय निकाल मिळाला?{% else %}What was the result after the season?{% endif %}
+            </label>
+            <textarea
+              class="form-control"
+              id="feedback-season-result"
+              name="season_result"
+              maxlength="240"
+              placeholder="{% if lang == 'mr' %}उत्पादन, खर्च, अडचणी किंवा निरीक्षण लिहा{% else %}Share yield, cost, issues, or any quick field note{% endif %}"
+            ></textarea>
+          </div>
+
+          <div class="result-actions justify-content-start">
+            <button class="btn-primary-clean" type="submit">
+              {% if lang == 'mr' %}अभिप्राय जतन करा{% else %}Save Feedback{% endif %}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const popupBackdrop = document.getElementById("feedbackPopupBackdrop");
+    const popupClose = document.getElementById("feedbackPopupClose");
+
+    if (!popupBackdrop || !popupClose) {
+      return;
+    }
+
+    popupClose.addEventListener("click", function () {
+      popupBackdrop.style.display = "none";
+    });
+  })();
+</script>
+{% endif %}

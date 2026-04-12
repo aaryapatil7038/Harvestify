@@ -1,0 +1,117 @@
+{
+  "dataset_path": "C:\\Users\\Aarya\\Downloads\\Harvestify\\XAI_Crop_Recommendation_System\\Data\\crop_recommendation_merged_maharashtra.csv",
+  "region": "Maharashtra",
+  "feature_columns": [
+    "N",
+    "P",
+    "K",
+    "temperature",
+    "humidity",
+    "ph",
+    "rainfall",
+    "season",
+    "water_source",
+    "water_availability"
+  ],
+  "feature_display_names": [
+    "Nitrogen",
+    "Phosphorous",
+    "Potassium",
+    "Temperature",
+    "Humidity",
+    "pH",
+    "Rainfall",
+    "Season",
+    "Water Source",
+    "Water Availability"
+  ],
+  "target_column": "label",
+  "class_names": [
+    "bajra",
+    "banana",
+    "blackgram",
+    "brinjal",
+    "cabbage",
+    "chili",
+    "cotton",
+    "cowpea",
+    "ginger",
+    "gram",
+    "grapes",
+    "groundnut",
+    "jowar",
+    "lentil",
+    "maize",
+    "mungbean",
+    "onion",
+    "orange",
+    "pomegranate",
+    "potato",
+    "ragi",
+    "rice",
+    "sesame",
+    "soybean",
+    "sugarcane",
+    "sunflower",
+    "tomato",
+    "tur",
+    "turmeric",
+    "wheat"
+  ],
+  "selected_model_name": "xgboost_multiclass_v2",
+  "selected_model_type": "XGBClassifier",
+  "uses_scaler": true,
+  "feature_reference": {
+    "N": {
+      "mean": 79.679167,
+      "median": 82.0,
+      "std": 43.517946
+    },
+    "P": {
+      "mean": 43.006111,
+      "median": 42.0,
+      "std": 11.330494
+    },
+    "K": {
+      "mean": 61.542778,
+      "median": 46.0,
+      "std": 41.51953
+    },
+    "temperature": {
+      "mean": 26.382763,
+      "median": 26.61,
+      "std": 4.027539
+    },
+    "humidity": {
+      "mean": 59.106049,
+      "median": 59.65,
+      "std": 13.319882
+    },
+    "ph": {
+      "mean": 6.748434,
+      "median": 6.77,
+      "std": 0.421724
+    },
+    "rainfall": {
+      "mean": 439.738909,
+      "median": 349.76,
+      "std": 353.93158
+    },
+    "season": {
+      "mode": "Kharif"
+    },
+    "water_source": {
+      "mode": "rainfed"
+    },
+    "water_availability": {
+      "mode": "medium"
+    }
+  },
+  "rows_per_crop_target": 600,
+  "split_summary": {
+    "train_rows": 14400,
+    "test_rows": 3600,
+    "validation_rows_for_tuning": 2160,
+    "train_test_split": "80_20_stratified"
+  }
+}

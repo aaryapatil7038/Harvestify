@@ -1,1 +1,5 @@
-weather_api_key = "9d7cde1f6d07ec55650544be1631307e"
+import os
+
+
+HARVESTIFY_SECRET_KEY = os.getenv("HARVESTIFY_SECRET_KEY", "")
+OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "")

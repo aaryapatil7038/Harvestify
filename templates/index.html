@@ -1,110 +1,106 @@
 {% extends 'layout.html' %}
-
 {% block body %}
-<!-- banner -->
-<section class="banner_w3lspvt" id="home">
-	<div class="csslider infinity" id="slider1">
-	
-				<div class="banner-top">
-					<div class="overlay">
-						<div class="container">
-							<div class="w3layouts-banner-info text-center">
-								<h3 class="text-wh">Harvestify</h3>
-								<h4 class="text-wh mx-auto my-4"><b>Get informed decisions about your farming strategy.</b></h4>
-								<br>
-								<h4 class="text-wh mx-auto my-4"><strong> Here are some questions we'll answer</strong></h4>
-								<p class="text-li mx-auto mt-2">
-									1. What crop to plant here? <br>
-									2. What fertilizer to use? <br>
-									3. Which disease do your crop have?<br>
-									4. How to cure the disease?</p>
-							</div>
-						</div>
-					</div>
-				</div>
-	</div>
-</section>
-<!-- //banner -->
 
-<!-- core values -->
-<section class="core-value py-5">
-	<div class="container py-md-4">
-		<h3 class="heading mb-sm-5 mb-4 text-center"> About Us</h3>
-		<div class="row core-grids">
-			<div class="col-lg-6 core-left">
-				<img src="{{ url_for('static', filename='images/core.jpg') }}" class="img-fluid" alt="" />
-			</div>
-			<div class="col-lg-6 core-right">
-				<h3 class="mt-4">Improving Agriculture, Improving Lives, Cultivating Crops To Make Farmers Increase
-					Profit.</h3>
-				<p class="mt-3">We use state-of-the-art machine learning and deep learning technologies to help you
-					guide through
-					the entire farming process. Make informed decisions to understand the demographics of your area,
-					understand the
-					factors that affect your crop and keep them healthy for a super awesome successful yield.</p>
-			</div>
-		</div>
-	</div>
-</section>
-<!-- //core values -->
+<div class="page-wrap">
 
-<!-- Products & Services -->
-<section class="blog py-5">
-	<div class="container py-md-5">
-		<h3 class="heading mb-sm-5 mb-4 text-center"> Our Services</h3>
-		<div class="row blog-grids">
-			<div class="col-lg-4 col-md-6 blog-left mb-lg-0 mb-sm-5 pb-lg-0 pb-5">
-				<img src="{{ url_for('static', filename='images/s3.jpg') }}" class="img-fluid" alt="" />
-				<a href="{{ url_for('crop_recommend') }}">
-					<div class="blog-info">
+  <section class="hero-shell">
+    <div class="hero-panel hero-copy">
+      <span class="eyebrow">{% if lang == 'mr' %}शेती निर्णय, अधिक सोपे{% else %}Field Decisions, Simplified{% endif %}</span>
+      <h1>{{ ui.home_title }}</h1>
+      <p class="hero-lead mt-3">{{ ui.home_subtitle }}</p>
 
-						<h4>Crop</h4>
-
-						<p class="mt-2"> Recommendation about the type of crops to be cultivated which is best suited
-							for the respective conditions</p>
-					</div>
-				</a>
-			</div>
-			<div class="col-lg-4 col-md-6 blog-middle mb-lg-0 mb-sm-5 pb-lg-0 pb-md-5">
-				<img src="{{ url_for('static', filename='images/s2.jpg') }}" class="img-fluid" alt="" />
-				<a href="{{ url_for('fertilizer_recommendation') }}">
-					<div class="blog-info">
-						<h4>Fertilizer</h4>
-						<p class="mt-2">Recommendation about the type of fertilizer best suited for the particular soil
-							and the recommended crop</p>
-					</div>
-				</a>
-			</div>
-			<div class="col-lg-4 col-md-6 blog-right mt-lg-0 mt-5 pt-lg-0 pt-md-5">
-
-				<img src="{{ url_for('static', filename='images/s4.jpg') }}" class="img-fluid" alt="">
-
-				<!-- <img src="images/s4.jpg" class="img-fliud" alt="" /> -->
-				<a href="{{ url_for('disease_prediction') }}">
-					<div class="blog-info">
-						<h4>Crop Disease</h4>
-						<p class="mt-2">Predicting the name and causes of crop disease and suggestions to cure it</p>
-					</div>
-				</a>
-			</div>
-		</div>
-	</div>
-</section>
-<!-- //Products & Services -->
-
-
-<!-- Creating custom grid and hover effect
-<section>
-<div class="col-lg-3 col-md-4 col-sm-6 col-xs-12">
-    <div class="hovereffect">
-        <img class="img-responsive" src="images/s2.jpg" alt="">
-        <div class="overlay">
-           <h2>Hover effect 1</h2>
-           <a class="info" href="#">link here</a>
+      <div class="hero-points mt-4">
+        <div class="hero-point">
+          <span class="hero-point-label">01</span>
+          <p>{{ ui.home_q1 }}</p>
         </div>
-    </div>
-</div> -->
+        <div class="hero-point">
+          <span class="hero-point-label">02</span>
+          <p>{{ ui.home_q2 }}</p>
+        </div>
+      </div>
 
-</html>
+      <div class="hero-actions mt-4">
+        <a class="btn-primary-clean btn-hero" href="{{ url_for('crop_recommend', lang=lang) }}">
+          {% if lang == 'mr' %}पीक शिफारस मिळवा{% else %}Get Crop Recommendation{% endif %}
+        </a>
+        <a class="btn-secondary-clean btn-hero-secondary" href="{{ url_for('fertilizer_recommendation', lang=lang) }}">
+          {% if lang == 'mr' %}खत नियोजक उघडा{% else %}Open Fertilizer Planner{% endif %}
+        </a>
+      </div>
+    </div>
+
+    <div class="hero-panel hero-stats-panel">
+      <div class="stat-card">
+        <span>{% if lang == 'mr' %}मुख्य कार्यप्रवाह{% else %}Core Workflow{% endif %}</span>
+        <strong>{% if lang == 'mr' %}स्थान + माती + हवामान{% else %}Location + soil + weather{% endif %}</strong>
+        <p>{% if lang == 'mr' %}पेरणीचा निर्णय घेण्यापूर्वी शेतातील महत्त्वाच्या सर्व परिस्थिती एकत्र पहा.{% else %}Bring field conditions together before making a planting decision.{% endif %}</p>
+      </div>
+      <div class="stat-card accent">
+        <span>{% if lang == 'mr' %}निर्णय सहाय्य{% else %}Decision Support{% endif %}</span>
+        <strong>{% if lang == 'mr' %}पीक आणि खत मार्गदर्शन{% else %}Crop and fertilizer guidance{% endif %}</strong>
+        <p>{% if lang == 'mr' %}कच्च्या इनपुटपासून उपयोगी पुढील टप्प्यांपर्यंत काही क्लिकमध्ये पोहोचा.{% else %}Move from raw inputs to practical next steps in a few clicks.{% endif %}</p>
+      </div>
+      <div class="stat-card wide">
+        <span>{% if lang == 'mr' %}दररोजच्या वापरासाठी{% else %}Built For Daily Use{% endif %}</span>
+        <strong>{% if lang == 'mr' %}सोपे स्क्रीन, जलद कृती, स्पष्ट निकाल{% else %}Simple screens, fast actions, clear results{% endif %}</strong>
+        <p>{% if lang == 'mr' %}एक शेत तपासत असाल किंवा अनेक सेव्ह केलेली ठिकाणे, वारंवार नियोजनासाठी शांत आणि सोपा इंटरफेस.{% else %}A calmer interface for repeat farm planning, whether you're checking one plot or several saved locations.{% endif %}</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section-band">
+    <div class="section-band-header text-center">
+      <span class="eyebrow">{% if lang == 'mr' %}सेवा{% else %}Services{% endif %}</span>
+      <h2>{% if lang == 'mr' %}आज तुम्हाला हवे असलेले नियोजन साधन निवडा{% else %}Choose the planning tool you need today{% endif %}</h2>
+      <p>{% if lang == 'mr' %}दोन्ही कार्यप्रवाह हलके, सोपे आणि महत्त्वाची माहिती स्पष्टपणे दाखवणारे आहेत.{% else %}Both workflows keep the experience lightweight while surfacing the information that matters most.{% endif %}</p>
+    </div>
+
+    <div class="feature-grid">
+
+      <div class="section-card feature-card">
+        <div class="feature-icon">C</div>
+        <h4>{{ ui.service_crop_title }}</h4>
+        <p class="mt-2">{{ ui.service_crop_desc }}</p>
+        <ul class="feature-list">
+          <li>{% if lang == 'mr' %}नकाशावर आधारित स्थान निवड आणि सध्याच्या हवामान इनपुटचा वापर करा.{% else %}Use map-based location picking and current weather inputs.{% endif %}</li>
+          <li>{% if lang == 'mr' %}स्पष्टीकरणासह सर्वोत्तम पीक पर्याय तपासा.{% else %}Review the top crop matches with explanation support.{% endif %}</li>
+          <li>{% if lang == 'mr' %}उत्पादन, बाजारभाव आणि नफा यासंबंधी तपशील पहा.{% else %}See yield, market price, and profit-oriented details.{% endif %}</li>
+        </ul>
+
+        <a class="btn-primary-clean feature-btn mt-3" href="{{ url_for('crop_recommend', lang=lang) }}">{% if lang == 'mr' %}पीक शिफारस मिळवा{% else %}Get Crop Recommendation{% endif %}</a>
+      </div>
+
+      <div class="section-card feature-card">
+        <div class="feature-icon feature-icon-accent">F</div>
+        <h4>{{ ui.service_fertilizer_title }}</h4>
+        <p class="mt-2">{{ ui.service_fertilizer_desc }}</p>
+        <ul class="feature-list">
+          <li>{% if lang == 'mr' %}मुख्य NPK मूल्ये आणि अपेक्षित पीक पटकन भरा.{% else %}Enter core NPK values and target crop quickly.{% endif %}</li>
+          <li>{% if lang == 'mr' %}अतिरिक्त गोंधळाशिवाय केंद्रित खत शिफारस मिळवा.{% else %}Receive a focused fertilizer recommendation without extra clutter.{% endif %}</li>
+          <li>{% if lang == 'mr' %}माती उपचाराचे नियोजन करताना जलद तुलना करण्यासाठी उपयुक्त.{% else %}Ideal for fast comparison while planning soil treatment.{% endif %}</li>
+        </ul>
+
+        <a class="btn-primary-clean feature-btn mt-3" href="{{ url_for('fertilizer_recommendation', lang=lang) }}">{% if lang == 'mr' %}खत सल्ला मिळवा{% else %}Get Fertilizer Suggestion{% endif %}</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="trust-strip">
+    <div class="trust-item">
+      <span>{% if lang == 'mr' %}केंद्रित{% else %}Focused{% endif %}</span>
+      <p>{% if lang == 'mr' %}अनावश्यक दृश्य गोंधळ कमी करून मुख्य कृती लगेच स्पष्ट दिसतात.{% else %}Reduced visual noise so the main actions stand out immediately.{% endif %}</p>
+    </div>
+    <div class="trust-item">
+      <span>{% if lang == 'mr' %}अनुकूल{% else %}Responsive{% endif %}</span>
+      <p>{% if lang == 'mr' %}फोन आणि टॅबलेटवर कार्ड आणि नियंत्रणे स्वच्छपणे जुळवून घेतात.{% else %}Cards and controls collapse cleanly for phone and tablet use.{% endif %}</p>
+    </div>
+    <div class="trust-item">
+      <span>{% if lang == 'mr' %}व्यावहारिक{% else %}Practical{% endif %}</span>
+      <p>{% if lang == 'mr' %}सामान्य डॅशबोर्डऐवजी प्रत्यक्ष शेतातील इनपुट लक्षात घेऊन रचना केली आहे.{% else %}Designed around real farm inputs, not generic dashboard filler.{% endif %}</p>
+    </div>
+  </section>
+
+</div>
 
 {% endblock %}
