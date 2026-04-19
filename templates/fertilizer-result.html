@@ -5,20 +5,18 @@
 
   <div class="page-hero text-center">
     <span class="eyebrow">{% if lang == 'mr' %}शिफारस तयार{% else %}Recommendation Ready{% endif %}</span>
-    <h2>{% if lang == 'mr' %}खत शिफारस{% else %}Fertilizer Recommendation{% endif %}</h2>
-    <p class="mt-2">{% if lang == 'mr' %}तुम्ही दिलेल्या मातीच्या मूल्यांनुसार खालील खत योजना तयार झाली आहे.{% else %}Your submitted soil values produced the following fertilizer schedule.{% endif %}</p>
+    <h2 class="fertilizer-result-hero-title">{% if lang == 'mr' %}खत शिफारस{% else %}Fertilizer Recommendation{% endif %}</h2>
+    <p class="mt-2">{% if lang == 'mr' %}तुम्ही दिलेल्या मातीच्या मूल्यानुसार खालील खत योजना तयार झाली आहे.{% else %}Your submitted soil values produced the following fertilizer schedule.{% endif %}</p>
   </div>
 
   <div class="result-center-shell">
     <div class="section-card result-card-emphasis fertilizer-result-card">
-      <span class="result-pill">{% if lang == 'mr' %}पिकानुसार खत योजना{% else %}Crop-Specific Fertilizer Plan{% endif %}</span>
+      <span class="result-pill fertilizer-result-pill">{% if lang == 'mr' %}पिकानुसार खत योजना{% else %}Crop-Specific Fertilizer Plan{% endif %}</span>
 
       <div class="fertilizer-result-body">
         <h4 class="mb-3">{{ plan.crop_name }}</h4>
         <p>{{ plan.summary }}</p>
       </div>
-
-      {% include '_model_info.html' %}
 
       <div class="summary-box-clean text-left mt-4">
         <div class="section-title mb-2">{% if lang == 'mr' %}माती आणि लक्ष्य मूल्ये{% else %}Soil vs Crop Target{% endif %}</div>
@@ -73,8 +71,6 @@
           {% endfor %}
         </ul>
       </div>
-
-      <p class="mini-note mt-4">{{ plan.note }}</p>
 
       {% include '_prediction_feedback.html' %}
 

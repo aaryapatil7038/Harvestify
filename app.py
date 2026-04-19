@@ -6,10 +6,35 @@ import pandas as pd
 import pickle
 import io
 import os
+import re
 import secrets
+import threading
 import requests
-from datetime import date, timedelta, datetime
+from datetime import date, timedelta, datetime, timezone
 from functools import lru_cache
+
+
+def load_local_env():
+    env_path = os.path.join(os.path.dirname(__file__), ".env")
+    if not os.path.exists(env_path):
+        return
+
+    try:
+        with open(env_path, "r", encoding="utf-8") as env_file:
+            for raw_line in env_file:
+                line = raw_line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                key = key.strip()
+                value = value.strip().strip('"').strip("'")
+                if key and key not in os.environ:
+                    os.environ[key] = value
+    except OSError:
+        return
+
+
+load_local_env()
 
 from utils.disease import disease_dic
 from utils.fertilizer import fertilizer_dic, fertilizer_dic_mr
@@ -20,6 +45,8 @@ from utils.fertilizer_logic import (
     get_fertilizer_recommendation_text,
 )
 from utils.crop_features import WATER_AVAILABILITY_OPTIONS, WATER_SOURCE_OPTIONS
+from utils.farm_chat import DEFAULT_SUGGESTIONS, generate_farm_chat_reply
+from utils.llm_chat import generate_llm_farm_chat_reply
 from utils.msamb_price import get_msamb_live_price
 from utils.yield_profit import estimate_yield_and_profit
 
@@ -57,12 +84,46 @@ disease_classes = [
 
 @lru_cache(maxsize=1)
 def get_crop_xai_runtime():
-    from xai_explainer import explain_crop_prediction, explain_specific_crop_prediction
+    from xai_explainer import (
+        explain_crop_prediction,
+        explain_crop_prediction_bundle,
+        explain_specific_crop_prediction,
+        explain_specific_crop_prediction_bundle,
+    )
 
     return {
         "explain_crop_prediction": explain_crop_prediction,
+        "explain_crop_prediction_bundle": explain_crop_prediction_bundle,
         "explain_specific_crop_prediction": explain_specific_crop_prediction,
+        "explain_specific_crop_prediction_bundle": explain_specific_crop_prediction_bundle,
     }
+
+
+_crop_runtime_warmup_lock = threading.Lock()
+_crop_runtime_warmup_started = False
+
+
+def start_crop_runtime_warmup():
+    global _crop_runtime_warmup_started
+
+    with _crop_runtime_warmup_lock:
+        if _crop_runtime_warmup_started:
+            return
+        _crop_runtime_warmup_started = True
+
+    def _warm_runtime():
+        global _crop_runtime_warmup_started
+        try:
+            get_crop_xai_runtime()
+        except Exception:
+            with _crop_runtime_warmup_lock:
+                _crop_runtime_warmup_started = False
+
+    threading.Thread(
+        target=_warm_runtime,
+        name="crop-runtime-warmup",
+        daemon=True,
+    ).start()
 
 
 @lru_cache(maxsize=1)
@@ -349,6 +410,7 @@ UI_TEXT["mr"].update({
     "high": "जास्त"
 })
 
+
 CROP_TRANSLATIONS = {
     "apple": "सफरचंद",
     "banana": "केळी",
@@ -499,6 +561,157 @@ def build_feedback_redirect_path(return_path, lang):
     )
 
 
+def sanitize_farm_chat_client_context(client_context):
+    if not isinstance(client_context, dict):
+        return {}
+
+    sanitized = {}
+
+    saved_farms = []
+    for item in list(client_context.get("savedFarms") or [])[:5]:
+        if not isinstance(item, dict):
+            continue
+        saved_farms.append({
+            "name": str(item.get("name", "")).strip()[:80],
+            "manual_location": str(item.get("manual_location", "")).strip()[:120],
+            "latitude": str(item.get("latitude", "")).strip()[:24],
+            "longitude": str(item.get("longitude", "")).strip()[:24],
+        })
+    sanitized["savedFarms"] = saved_farms
+
+    recent_predictions = []
+    for item in list(client_context.get("recentPredictions") or [])[:5]:
+        if not isinstance(item, dict):
+            continue
+        top3_raw = []
+        for entry in list(item.get("top3Raw") or [])[:3]:
+            if not isinstance(entry, dict):
+                continue
+            top3_raw.append({
+                "crop": str(entry.get("crop", "")).strip()[:60],
+                "confidence": entry.get("confidence"),
+            })
+        recent_predictions.append({
+            "prediction": str(item.get("prediction", "")).strip()[:60],
+            "predictionRaw": str(item.get("predictionRaw", "")).strip()[:60],
+            "currentSeason": str(item.get("currentSeason", "")).strip()[:40],
+            "currentSeasonRaw": str(item.get("currentSeasonRaw", "")).strip()[:40],
+            "weatherCity": str(item.get("weatherCity", "")).strip()[:80],
+            "estimatedProfit": str(item.get("estimatedProfit", "")).strip()[:40],
+            "top3Raw": top3_raw,
+        })
+    sanitized["recentPredictions"] = recent_predictions
+
+    latest_weather = client_context.get("latestWeather") or {}
+    if isinstance(latest_weather, dict):
+        sanitized["latestWeather"] = {
+            "city": str(latest_weather.get("city", "")).strip()[:80],
+            "temperature": latest_weather.get("temperature"),
+            "humidity": latest_weather.get("humidity"),
+            "rainfall": latest_weather.get("rainfall"),
+            "savedAt": str(latest_weather.get("savedAt", "")).strip()[:60],
+        }
+    else:
+        sanitized["latestWeather"] = {}
+
+    sanitized["page"] = str(client_context.get("page", "")).strip()[:120]
+    return sanitized
+
+
+def detect_farm_chat_language(message, fallback_lang="en"):
+    normalized_fallback = "mr" if fallback_lang == "mr" else "en"
+    text = str(message or "").strip()
+    if not text:
+        return normalized_fallback
+
+    if re.search(r"[\u0900-\u097F]", text):
+        return "mr"
+
+    lowered = text.lower()
+    marathi_roman_tokens = [
+        "mala", "majha", "majhi", "majhe", "maze", "mazhe",
+        "shet", "sheti", "ksheti", "kshetri", "pik", "havaaman", "havaman",
+        "kase", "kashi", "karayche", "karaychi", "karave", "karachi",
+        "aahe", "ahe", "sanga", "pahije", "kuthe", "konta", "konti", "aaj", "udya",
+    ]
+    token_hits = sum(1 for token in marathi_roman_tokens if token in lowered)
+    if token_hits >= 2:
+        return "mr"
+
+    if re.search(r"[a-zA-Z]", text):
+        return "en"
+
+    return normalized_fallback
+
+
+def detect_farm_chat_language_preference(message):
+    lowered = str(message or "").strip().lower()
+    if not lowered:
+        return None
+
+    marathi_preference_tokens = [
+        "reply in marathi", "answer in marathi", "respond in marathi",
+        "मराठीत उत्तर", "मराठीत उत्तर", "marathi madhe", "marathi madhye",
+        "marathi me", "marathi mai",
+    ]
+    english_preference_tokens = [
+        "reply in english", "answer in english", "respond in english",
+        "english madhe", "english madhye", "english me", "english mai",
+    ]
+
+    if any(token in lowered for token in marathi_preference_tokens):
+        return "mr"
+    if any(token in lowered for token in english_preference_tokens):
+        return "en"
+    return None
+
+
+def build_farm_chat_session_context(lang):
+    context = {
+        "last_crop_result": session.get("last_crop_result") or {},
+    }
+
+    saved_result = session.get("last_fertilizer_result") or {}
+    recommendation_key = saved_result.get("recommendation_key")
+
+    if recommendation_key:
+        crop_name = saved_result.get("crop_name")
+        reference_n = saved_result.get("reference_n")
+        reference_p = saved_result.get("reference_p")
+        reference_k = saved_result.get("reference_k")
+        actual_n = saved_result.get("actual_n")
+        actual_p = saved_result.get("actual_p")
+        actual_k = saved_result.get("actual_k")
+
+        if None not in {reference_n, reference_p, reference_k, actual_n, actual_p, actual_k}:
+            context["last_fertilizer_plan"] = build_fertilizer_plan(
+                crop_name=crop_name,
+                reference_n=int(reference_n),
+                reference_p=int(reference_p),
+                reference_k=int(reference_k),
+                actual_n=int(actual_n),
+                actual_p=int(actual_p),
+                actual_k=int(actual_k),
+                lang=lang
+            )
+
+    return context
+
+
+def append_farm_chat_turn(role, content):
+    history = list(session.get("farm_chat_history") or [])
+    history.append({
+        "role": role,
+        "content": str(content or "").strip()[:500],
+        "time": datetime.now(timezone.utc).isoformat(),
+    })
+    session["farm_chat_history"] = history[-8:]
+
+
+def get_farm_chat_history():
+    return list(session.get("farm_chat_history") or [])
+
+
 def get_model_info(lang):
     return {
         "version_label": "मॉडेल आवृत्ती" if lang == "mr" else "Model version",
@@ -521,67 +734,130 @@ def render_input_error(lang, message, status_code=400, retry_endpoint="home"):
     ), status_code
 
 
-def parse_numeric_field(form_data, field_name, display_name, minimum=None, maximum=None, integer_only=False):
+VALIDATION_FIELD_LABELS = {
+    "Crop": {"mr": "पीक"},
+    "Nitrogen": {"mr": "नायट्रोजन"},
+    "Phosphorous": {"mr": "फॉस्फरस"},
+    "Potassium": {"mr": "पोटॅशियम"},
+    "pH": {"mr": "pH"},
+    "Land area": {"mr": "जमिनीचे क्षेत्रफळ"},
+    "Land unit": {"mr": "जमिनीचे एकक"},
+    "Water source": {"mr": "पाण्याचा स्रोत"},
+    "Water availability": {"mr": "पाण्याची उपलब्धता"},
+    "Location method": {"mr": "स्थान पद्धत"},
+    "Manual location": {"mr": "हाताने टाकलेले स्थान"},
+    "Rainfall": {"mr": "पाऊस"},
+    "Weather city": {"mr": "हवामान शहर"},
+    "Temperature": {"mr": "तापमान"},
+    "Humidity": {"mr": "आर्द्रता"},
+}
+
+
+def localize_validation_field(display_name, lang):
+    if lang == "mr":
+        return VALIDATION_FIELD_LABELS.get(display_name, {}).get("mr", display_name)
+    return display_name
+
+
+def format_validation_message(lang, display_name, error_type, value=None):
+    field_label = localize_validation_field(display_name, lang)
+
+    if lang == "mr":
+        if error_type == "required":
+            return f"{field_label} आवश्यक आहे."
+        if error_type == "invalid_number":
+            return f"{field_label} वैध संख्या असणे आवश्यक आहे."
+        if error_type == "whole_number":
+            return f"{field_label} पूर्ण संख्या असणे आवश्यक आहे."
+        if error_type == "minimum":
+            return f"{field_label} किमान {value} असणे आवश्यक आहे."
+        if error_type == "maximum":
+            return f"{field_label} कमाल {value} असणे आवश्यक आहे."
+        if error_type == "invalid_choice":
+            return f"{field_label} चुकीचे आहे."
+        if error_type == "max_length":
+            return f"{field_label} {value} पेक्षा कमी अक्षरांचे असणे आवश्यक आहे."
+
+    if error_type == "required":
+        return "{0} is required.".format(field_label)
+    if error_type == "invalid_number":
+        return "{0} must be a valid number.".format(field_label)
+    if error_type == "whole_number":
+        return "{0} must be a whole number.".format(field_label)
+    if error_type == "minimum":
+        return "{0} must be at least {1}.".format(field_label, value)
+    if error_type == "maximum":
+        return "{0} must be at most {1}.".format(field_label, value)
+    if error_type == "invalid_choice":
+        return "{0} is invalid.".format(field_label)
+    if error_type == "max_length":
+        return "{0} must be shorter than {1} characters.".format(field_label, value)
+
+    return str(field_label)
+
+
+def parse_numeric_field(form_data, field_name, display_name, minimum=None, maximum=None, integer_only=False, lang="en"):
     raw_value = str(form_data.get(field_name, "")).strip()
 
     if raw_value == "":
-        raise ValidationError("{0} is required.".format(display_name))
+        raise ValidationError(format_validation_message(lang, display_name, "required"))
 
     try:
         value = float(raw_value)
     except ValueError:
-        raise ValidationError("{0} must be a valid number.".format(display_name))
+        raise ValidationError(format_validation_message(lang, display_name, "invalid_number"))
 
     if integer_only and not value.is_integer():
-        raise ValidationError("{0} must be a whole number.".format(display_name))
+        raise ValidationError(format_validation_message(lang, display_name, "whole_number"))
 
     if minimum is not None and value < minimum:
-        raise ValidationError("{0} must be at least {1}.".format(display_name, minimum))
+        raise ValidationError(format_validation_message(lang, display_name, "minimum", minimum))
 
     if maximum is not None and value > maximum:
-        raise ValidationError("{0} must be at most {1}.".format(display_name, maximum))
+        raise ValidationError(format_validation_message(lang, display_name, "maximum", maximum))
 
     return int(value) if integer_only else value
 
 
-def validate_choice_field(form_data, field_name, display_name, allowed_values):
+def validate_choice_field(form_data, field_name, display_name, allowed_values, lang="en"):
     value = str(form_data.get(field_name, "")).strip()
 
     if not value:
-        raise ValidationError("{0} is required.".format(display_name))
+        raise ValidationError(format_validation_message(lang, display_name, "required"))
 
     if value not in allowed_values:
-        raise ValidationError("{0} is invalid.".format(display_name))
+        raise ValidationError(format_validation_message(lang, display_name, "invalid_choice"))
 
     return value
 
 
-def validate_optional_text_field(form_data, field_name, display_name, max_length=120):
+def validate_optional_text_field(form_data, field_name, display_name, max_length=120, lang="en"):
     value = str(form_data.get(field_name, "")).strip()
 
     if len(value) > max_length:
-        raise ValidationError("{0} must be shorter than {1} characters.".format(display_name, max_length + 1))
+        raise ValidationError(format_validation_message(lang, display_name, "max_length", max_length + 1))
 
     return value
 
 
-def validate_crop_form_input(form_data):
+def validate_crop_form_input(form_data, lang="en"):
     validated = {
-        "N": parse_numeric_field(form_data, "nitrogen", "Nitrogen", minimum=0, maximum=300),
-        "P": parse_numeric_field(form_data, "phosphorous", "Phosphorous", minimum=0, maximum=300),
-        "K": parse_numeric_field(form_data, "pottasium", "Potassium", minimum=0, maximum=300),
-        "ph": parse_numeric_field(form_data, "ph", "pH", minimum=0, maximum=14),
-        "land_area": parse_numeric_field(form_data, "land_area", "Land area", minimum=0.01, maximum=100000),
-        "land_unit": validate_choice_field(form_data, "land_unit", "Land unit", ALLOWED_LAND_UNITS),
-        "water_source": validate_choice_field(form_data, "water_source", "Water source", ALLOWED_WATER_SOURCES),
+        "N": parse_numeric_field(form_data, "nitrogen", "Nitrogen", minimum=0, maximum=300, lang=lang),
+        "P": parse_numeric_field(form_data, "phosphorous", "Phosphorous", minimum=0, maximum=300, lang=lang),
+        "K": parse_numeric_field(form_data, "pottasium", "Potassium", minimum=0, maximum=300, lang=lang),
+        "ph": parse_numeric_field(form_data, "ph", "pH", minimum=0, maximum=14, lang=lang),
+        "land_area": parse_numeric_field(form_data, "land_area", "Land area", minimum=0.01, maximum=100000, lang=lang),
+        "land_unit": validate_choice_field(form_data, "land_unit", "Land unit", ALLOWED_LAND_UNITS, lang=lang),
+        "water_source": validate_choice_field(form_data, "water_source", "Water source", ALLOWED_WATER_SOURCES, lang=lang),
         "water_availability": validate_choice_field(
             form_data,
             "water_availability",
             "Water availability",
-            ALLOWED_WATER_AVAILABILITY
+            ALLOWED_WATER_AVAILABILITY,
+            lang=lang
         ),
-        "location_method": validate_choice_field(form_data, "location_method", "Location method", ALLOWED_LOCATION_METHODS),
-        "manual_location": validate_optional_text_field(form_data, "manual_location", "Manual location", max_length=120)
+        "location_method": validate_choice_field(form_data, "location_method", "Location method", ALLOWED_LOCATION_METHODS, lang=lang),
+        "manual_location": validate_optional_text_field(form_data, "manual_location", "Manual location", max_length=120, lang=lang)
     }
 
     rainfall_raw = str(form_data.get("rainfall", "")).strip()
@@ -592,12 +868,13 @@ def validate_crop_form_input(form_data):
             "rainfall",
             "Rainfall",
             minimum=0,
-            maximum=5000
+            maximum=5000,
+            lang=lang
         )
 
     validated["latitude"] = str(form_data.get("latitude", "")).strip()
     validated["longitude"] = str(form_data.get("longitude", "")).strip()
-    validated["weather_city"] = validate_optional_text_field(form_data, "weather_city", "Weather city", max_length=120)
+    validated["weather_city"] = validate_optional_text_field(form_data, "weather_city", "Weather city", max_length=120, lang=lang)
     validated["weather_temperature"] = None
     validated["weather_humidity"] = None
 
@@ -608,7 +885,8 @@ def validate_crop_form_input(form_data):
             "weather_temperature",
             "Temperature",
             minimum=-50,
-            maximum=80
+            maximum=80,
+            lang=lang
         )
 
     weather_humidity_raw = str(form_data.get("weather_humidity", "")).strip()
@@ -618,7 +896,8 @@ def validate_crop_form_input(form_data):
             "weather_humidity",
             "Humidity",
             minimum=0,
-            maximum=100
+            maximum=100,
+            lang=lang
         )
 
     if validated["location_method"] == "manual":
@@ -636,17 +915,18 @@ def validate_crop_form_input(form_data):
     return validated
 
 
-def validate_fertilizer_form_input(form_data, fertilizer_df):
+def validate_fertilizer_form_input(form_data, fertilizer_df, lang="en"):
     validated = {
         "crop_name": validate_choice_field(
             form_data,
             "cropname",
             "Crop",
-            set(fertilizer_df["Crop"].astype(str).str.strip().tolist())
+            set(fertilizer_df["Crop"].astype(str).str.strip().tolist()),
+            lang=lang
         ),
-        "N": parse_numeric_field(form_data, "nitrogen", "Nitrogen", minimum=0, maximum=300),
-        "P": parse_numeric_field(form_data, "phosphorous", "Phosphorous", minimum=0, maximum=300),
-        "K": parse_numeric_field(form_data, "pottasium", "Potassium", minimum=0, maximum=300)
+        "N": parse_numeric_field(form_data, "nitrogen", "Nitrogen", minimum=0, maximum=300, lang=lang),
+        "P": parse_numeric_field(form_data, "phosphorous", "Phosphorous", minimum=0, maximum=300, lang=lang),
+        "K": parse_numeric_field(form_data, "pottasium", "Potassium", minimum=0, maximum=300, lang=lang)
     }
     return validated
 
@@ -826,6 +1106,7 @@ def resolve_location_and_weather(lang, latitude="", longitude="", manual_locatio
         "latitude": round(float(latitude), 6),
         "longitude": round(float(longitude), 6),
         "city": city,
+        "location_name": city,
         "temperature": temperature,
         "humidity": humidity,
         "rainfall": api_rainfall
@@ -1298,6 +1579,8 @@ def get_lang():
     return "mr" if lang == "mr" else "en"
 
 
+
+
 def translate_crop_name(crop_name, lang):
     if lang == "mr":
         return CROP_TRANSLATIONS.get(crop_name.lower(), crop_name)
@@ -1463,39 +1746,226 @@ def localize_crop_output(prediction, top3_predictions, explanation_df, explanati
     return localized_prediction, localized_top3, localized_explanation_df, localized_explanations
 
 
+def localize_explanation_dataframe(explanation_df, lang):
+    localized_df = explanation_df.copy()
+
+    if lang == "mr" and not localized_df.empty:
+        if "Feature" in localized_df.columns:
+            localized_df["Feature"] = localized_df["Feature"].replace(FEATURE_TRANSLATIONS)
+        if "Effect" in localized_df.columns:
+            localized_df["Effect"] = localized_df["Effect"].apply(
+                lambda effect_text: translate_effect(effect_text, lang)
+            )
+
+    return localized_df
+
+
+def build_crop_explanation_bundle_from_legacy(
+    shap_table,
+    shap_detail_table,
+    shap_lines,
+    prediction,
+    top3_predictions,
+):
+    empty_lime_df = pd.DataFrame(columns=["Feature", "Local Weight", "Effect"])
+
+    return {
+        "prediction": prediction,
+        "top3_predictions": top3_predictions,
+        "shap_table": shap_table,
+        "shap_detail_table": shap_detail_table,
+        "shap_lines": shap_lines,
+        "lime_table": empty_lime_df,
+        "lime_detail_table": empty_lime_df.copy(),
+        "lime_lines": [],
+        "consensus_summary": "",
+        "shap_method": "fallback",
+        "lime_method": "fallback",
+    }
+
+
+def normalize_crop_explanation_bundle(explanation_result):
+    if isinstance(explanation_result, dict):
+        return explanation_result
+
+    return build_crop_explanation_bundle_from_legacy(*explanation_result)
+
+
+def _get_top_feature_signs(explanation_df, value_column, limit=4):
+    if explanation_df is None or explanation_df.empty or value_column not in explanation_df.columns:
+        return {}
+
+    ranked_df = explanation_df.copy()
+    ranked_df = ranked_df.reindex(
+        ranked_df[value_column].abs().sort_values(ascending=False).index
+    ).head(limit)
+
+    sign_map = {}
+    for _, row in ranked_df.iterrows():
+        feature_name = row["Feature"]
+        raw_value = float(row[value_column])
+        if raw_value > 0.0001:
+            sign_map[feature_name] = 1
+        elif raw_value < -0.0001:
+            sign_map[feature_name] = -1
+        else:
+            sign_map[feature_name] = 0
+    return sign_map
+
+
+def generate_dual_xai_summary(prediction, shap_df, lime_df, lang):
+    crop_name = translate_crop_name(prediction, lang)
+    shap_signs = _get_top_feature_signs(shap_df, "Impact Value")
+    lime_signs = _get_top_feature_signs(lime_df, "Local Weight")
+
+    shared_features = [feature for feature in shap_signs if feature in lime_signs]
+    agreed_positive = [
+        feature for feature in shared_features if shap_signs[feature] > 0 and lime_signs[feature] > 0
+    ]
+    agreed_negative = [
+        feature for feature in shared_features if shap_signs[feature] < 0 and lime_signs[feature] < 0
+    ]
+    disagreed = [
+        feature
+        for feature in shared_features
+        if shap_signs[feature] != 0 and lime_signs[feature] != 0 and shap_signs[feature] != lime_signs[feature]
+    ]
+
+    if lang == "mr":
+        positive_text = ""
+        negative_text = ""
+        disagreement_text = ""
+
+        if agreed_positive:
+            positive_text = " SHAP आणि LIME दोन्ही {0} या घटकांना अनुकूल मानतात.".format(
+                ", ".join(agreed_positive[:3])
+            )
+        if agreed_negative:
+            negative_text = " दोन्ही पद्धती {0} या घटकांना मर्यादा दाखवणारे मानतात.".format(
+                ", ".join(agreed_negative[:3])
+            )
+        if disagreed:
+            disagreement_text = " {0} बाबत दोन्ही पद्धतींचे मत वेगळे आहे, त्यामुळे त्या घटकांकडे जपून पाहणे योग्य ठरेल.".format(
+                ", ".join(disagreed[:2])
+            )
+
+        if not any([positive_text, negative_text, disagreement_text]):
+            return (
+                "{0} या पिकासाठी SHAP मोठ्या चित्रातून कारणे दाखवते, "
+                "तर LIME तुमच्या ह्या नेमक्या इनपुटसाठी स्थानिक कारणे दाखवते."
+            ).format(crop_name)
+
+        return (
+            "{0} या पिकासाठी SHAP मोठ्या चित्रातून कारणे दाखवते, "
+            "तर LIME तुमच्या ह्या नेमक्या इनपुटसाठी स्थानिक कारणे दाखवते."
+        ).format(crop_name) + positive_text + negative_text + disagreement_text
+
+    positive_text = ""
+    negative_text = ""
+    disagreement_text = ""
+
+    if agreed_positive:
+        positive_text = " Both SHAP and LIME highlight {0} as supportive factors.".format(
+            ", ".join(agreed_positive[:3])
+        )
+    if agreed_negative:
+        negative_text = " Both methods flag {0} as limiting factors.".format(
+            ", ".join(agreed_negative[:3])
+        )
+    if disagreed:
+        disagreement_text = " They disagree on {0}, so those factors should be read more carefully.".format(
+            ", ".join(disagreed[:2])
+        )
+
+    if not any([positive_text, negative_text, disagreement_text]):
+        return (
+            "SHAP gives the broader model view for {0}, while LIME explains the exact local decision for this input."
+        ).format(crop_name)
+
+    return (
+        "SHAP gives the broader model view for {0}, while LIME explains the exact local decision for this input."
+    ).format(crop_name) + positive_text + negative_text + disagreement_text
+
+
+def localize_crop_xai_bundle(bundle, lang):
+    localized_prediction = translate_crop_name(bundle["prediction"], lang)
+
+    localized_top3 = []
+    for item in bundle["top3_predictions"]:
+        localized_top3.append({
+            "crop": translate_crop_name(item["crop"], lang),
+            "confidence": item["confidence"],
+            "actual_confidence": item.get("actual_confidence", item["confidence"]),
+            "season_bonus": item.get("season_bonus", 0),
+            "season_adjusted_score": item.get(
+                "season_adjusted_score",
+                item.get("actual_confidence", item["confidence"])
+            )
+        })
+
+    localized_shap_df = localize_explanation_dataframe(bundle["shap_table"], lang)
+    localized_lime_df = localize_explanation_dataframe(bundle["lime_table"], lang)
+
+    localized_shap_lines = [
+        translate_explanation_line(line, bundle["prediction"], lang)
+        for line in bundle.get("shap_lines", [])
+    ]
+    localized_lime_lines = [
+        translate_explanation_line(line, bundle["prediction"], lang)
+        for line in bundle.get("lime_lines", [])
+    ]
+
+    return {
+        "prediction": localized_prediction,
+        "top3_predictions": localized_top3,
+        "shap_table": localized_shap_df,
+        "shap_lines": localized_shap_lines,
+        "lime_table": localized_lime_df,
+        "lime_lines": localized_lime_lines,
+        "consensus_summary": generate_dual_xai_summary(
+            bundle["prediction"],
+            localized_shap_df,
+            localized_lime_df,
+            lang,
+        ),
+    }
+
+
 def render_saved_crop_result(saved_result, lang):
     current_season_raw = saved_result.get("current_season")
     feedback_prompt_visible = saved_result.get("show_feedback_prompt", False) and not saved_result.get("feedback_submitted", False)
+    shap_table_df = pd.DataFrame(saved_result.get("explanation", []))
+    lime_table_df = pd.DataFrame(saved_result.get("lime_explanation", []))
+
+    bundle = {
+        "prediction": saved_result["prediction_raw"],
+        "top3_predictions": saved_result["top3_predictions"],
+        "shap_table": shap_table_df,
+        "shap_lines": saved_result.get("explanations", []),
+        "lime_table": lime_table_df,
+        "lime_lines": saved_result.get("lime_explanations", []),
+    }
+    localized_xai = localize_crop_xai_bundle(bundle, lang)
 
     return render_template(
         "crop-result.html",
         lang=lang,
         ui=UI_TEXT[lang],
-        prediction=translate_crop_name(saved_result["prediction_raw"], lang),
+        prediction=localized_xai["prediction"],
         prediction_raw=saved_result["prediction_raw"],
-        top3_predictions=[
-            {
-                "crop": translate_crop_name(item["crop"], lang),
-                "confidence": item["confidence"],
-                "actual_confidence": item.get("actual_confidence", item["confidence"]),
-                "season_bonus": item.get("season_bonus", 0),
-                "season_adjusted_score": item.get(
-                    "season_adjusted_score",
-                    item.get("actual_confidence", item["confidence"])
-                )
-            }
-            for item in saved_result["top3_predictions"]
-        ],
+        top3_predictions=localized_xai["top3_predictions"],
         top3_predictions_raw=saved_result["top3_predictions"],
-        explanation=pd.DataFrame(saved_result["explanation"]),
-        explanations=[
-            translate_explanation_line(line, saved_result["prediction_raw"], lang)
-            for line in saved_result["explanations"]
-        ],
+        explanation=localized_xai["shap_table"],
+        explanations=localized_xai["shap_lines"],
+        lime_explanation=localized_xai["lime_table"],
+        lime_explanations=localized_xai["lime_lines"],
+        xai_consensus_summary=localized_xai["consensus_summary"],
+        shap_method=saved_result.get("shap_method", "fallback"),
+        lime_method=saved_result.get("lime_method", "fallback"),
         overall_summary=generate_overall_summary(
             saved_result["prediction_raw"],
             saved_result["top3_predictions"],
-            pd.DataFrame(saved_result["explanation"]),
+            shap_table_df,
             lang
         ),
         land_area=saved_result["land_area"],
@@ -1517,7 +1987,6 @@ def render_saved_crop_result(saved_result, lang):
         current_season=translate_season_name(current_season_raw, lang),
         current_season_raw=current_season_raw,
         sowing_guidance=get_crop_sowing_guidance(saved_result["prediction_raw"], lang),
-        model_info=get_model_info(lang),
         show_feedback_prompt=feedback_prompt_visible,
         feedback_status=request.args.get("feedback") == "submitted",
         feedback_prediction_type="crop",
@@ -1588,7 +2057,8 @@ def render_fertilizer_result_page(saved_result, lang):
         reference_k=int(reference_k),
         actual_n=int(actual_n),
         actual_p=int(actual_p),
-        actual_k=int(actual_k)
+        actual_k=int(actual_k),
+        lang=lang
     )
 
     return render_template(
@@ -1596,7 +2066,6 @@ def render_fertilizer_result_page(saved_result, lang):
         plan=plan,
         lang=lang,
         ui=UI_TEXT[lang],
-        model_info=get_model_info(lang),
         show_feedback_prompt=feedback_prompt_visible,
         feedback_status=request.args.get("feedback") == "submitted",
         feedback_prediction_type="fertilizer",
@@ -1616,17 +2085,22 @@ app.secret_key = os.environ.get("HARVESTIFY_SECRET_KEY") or secrets.token_hex(32
 @app.route('/')
 def home():
     lang = get_lang()
+    start_crop_runtime_warmup()
     return render_template(
         'index.html',
         lang=lang,
         ui=UI_TEXT[lang],
+        home_model_info=get_model_info(lang),
         title="Harvestify"
     )
+
+
 
 
 @app.route('/crop-recommend')
 def crop_recommend():
     lang = get_lang()
+    start_crop_runtime_warmup()
     return render_template(
         'crop.html',
         lang=lang,
@@ -1653,6 +2127,7 @@ def crop_result_page():
 @app.route('/fertilizer')
 def fertilizer_recommendation():
     lang = get_lang()
+    start_crop_runtime_warmup()
     fertilizer_reference_df = get_fertilizer_reference_df()
     return render_template(
         'fertilizer.html',
@@ -1712,6 +2187,65 @@ def prediction_feedback():
     return redirect(build_feedback_redirect_path(return_path, lang))
 
 
+@app.route('/farm-chat', methods=['POST'])
+def farm_chat():
+    page_lang = get_lang()
+    payload = request.get_json(silent=True) or {}
+    action = str(payload.get("action", "")).strip().lower()
+
+    if action == "reset":
+        session.pop("farm_chat_history", None)
+        session.pop("farm_chat_force_lang", None)
+        return jsonify({
+            "success": True,
+            "reply": "चॅट इतिहास रीसेट झाला. आता तुम्ही नवीन प्रश्न विचारू शकता." if page_lang == "mr" else "Chat history has been reset. You can start with a fresh question now.",
+            "suggestions": DEFAULT_SUGGESTIONS[page_lang],
+        })
+
+    message = str(payload.get("message", "")).strip()[:500]
+    client_context = sanitize_farm_chat_client_context(payload.get("client_context"))
+    forced_lang = session.get("farm_chat_force_lang")
+    requested_lang = detect_farm_chat_language_preference(message)
+    if requested_lang:
+        session["farm_chat_force_lang"] = requested_lang
+        forced_lang = requested_lang
+
+    chat_lang = detect_farm_chat_language(message, forced_lang or page_lang)
+    if forced_lang:
+        chat_lang = forced_lang
+    session_context = build_farm_chat_session_context(chat_lang)
+
+    if message:
+        append_farm_chat_turn("user", message)
+
+    response_payload = generate_llm_farm_chat_reply(
+        message=message,
+        lang=chat_lang,
+        session_context=session_context,
+        client_context=client_context,
+        chat_history=get_farm_chat_history(),
+    )
+
+    if not response_payload:
+        response_payload = generate_farm_chat_reply(
+            message=message,
+            lang=chat_lang,
+            session_context=session_context,
+            client_context=client_context,
+            crop_translations=CROP_TRANSLATIONS,
+        )
+
+    reply_text = str(response_payload.get("reply", "")).strip()
+    if reply_text:
+        append_farm_chat_turn("assistant", reply_text)
+
+    return jsonify({
+        "success": True,
+        "reply": reply_text,
+        "suggestions": response_payload.get("suggestions") or DEFAULT_SUGGESTIONS[lang],
+    })
+
+
 @app.route('/disease')
 def disease():
     lang = get_lang()
@@ -1758,6 +2292,7 @@ def get_weather_data():
         return jsonify({
             "success": True,
             "city": weather_info["city"],
+            "location_name": weather_info["location_name"],
             "temperature": weather_info["temperature"],
             "humidity": weather_info["humidity"],
             "rainfall": weather_info["rainfall"],
@@ -1833,7 +2368,7 @@ def crop_prediction():
         )
 
     try:
-        validated_input = validate_crop_form_input(request.form)
+        validated_input = validate_crop_form_input(request.form, lang=lang)
         N = validated_input["N"]
         P = validated_input["P"]
         K = validated_input["K"]
@@ -1914,20 +2449,47 @@ def crop_prediction():
         print("=======================================\n")
 
         crop_xai_runtime = get_crop_xai_runtime()
-        merged_df, shap_df, explanations, prediction, top3_predictions = crop_xai_runtime["explain_crop_prediction"](input_df)
+        explain_bundle_fn = crop_xai_runtime.get("explain_crop_prediction_bundle")
+        if explain_bundle_fn is not None:
+            explanation_bundle = normalize_crop_explanation_bundle(explain_bundle_fn(input_df))
+        else:
+            explanation_bundle = normalize_crop_explanation_bundle(
+                crop_xai_runtime["explain_crop_prediction"](input_df)
+            )
 
         current_season, top3_predictions = rerank_top3_predictions_by_season(
-            top3_predictions,
+            explanation_bundle["top3_predictions"],
             season=current_season
         )
 
         final_prediction = top3_predictions[0]["crop"]
-        if final_prediction != prediction:
-            merged_df, shap_df, explanations, prediction, top3_predictions = crop_xai_runtime["explain_specific_crop_prediction"](
-                input_df,
-                final_prediction,
-                top3_predictions=top3_predictions
-            )
+        if final_prediction != explanation_bundle["prediction"]:
+            explain_specific_bundle_fn = crop_xai_runtime.get("explain_specific_crop_prediction_bundle")
+            if explain_specific_bundle_fn is not None:
+                explanation_bundle = normalize_crop_explanation_bundle(
+                    explain_specific_bundle_fn(
+                        input_df,
+                        final_prediction,
+                        top3_predictions=top3_predictions
+                    )
+                )
+            else:
+                explanation_bundle = normalize_crop_explanation_bundle(
+                    crop_xai_runtime["explain_specific_crop_prediction"](
+                        input_df,
+                        final_prediction,
+                        top3_predictions=top3_predictions
+                    )
+                )
+        else:
+            explanation_bundle["top3_predictions"] = top3_predictions
+
+        merged_df = explanation_bundle["shap_table"]
+        explanations = explanation_bundle.get("shap_lines", [])
+        lime_df = explanation_bundle.get("lime_table", pd.DataFrame())
+        lime_explanations = explanation_bundle.get("lime_lines", [])
+        prediction = explanation_bundle["prediction"]
+        top3_predictions = explanation_bundle["top3_predictions"]
 
         print("\n========== MODEL OUTPUT ==========")
         print("Prediction:", prediction)
@@ -1938,9 +2500,14 @@ def crop_prediction():
         market_data = get_msamb_live_price(prediction, city)
         live_modal_price_num = market_data["modal_price"] if market_data else None
 
-        prediction_display, top3_display, explanation_display, explanations_display = localize_crop_output(
-            prediction, top3_predictions, merged_df, explanations, lang
-        )
+        localized_xai = localize_crop_xai_bundle(explanation_bundle, lang)
+        prediction_display = localized_xai["prediction"]
+        top3_display = localized_xai["top3_predictions"]
+        explanation_display = localized_xai["shap_table"]
+        explanations_display = localized_xai["shap_lines"]
+        lime_explanation_display = localized_xai["lime_table"]
+        lime_explanations_display = localized_xai["lime_lines"]
+        xai_consensus_summary = localized_xai["consensus_summary"]
 
         overall_summary = generate_overall_summary(
             prediction,
@@ -1999,6 +2566,11 @@ def crop_prediction():
             "top3_predictions": top3_predictions,
             "explanation": merged_df.to_dict(orient="records"),
             "explanations": explanations,
+            "lime_explanation": lime_df.to_dict(orient="records"),
+            "lime_explanations": lime_explanations,
+            "xai_consensus_summary": explanation_bundle.get("consensus_summary", ""),
+            "shap_method": explanation_bundle.get("shap_method", "fallback"),
+            "lime_method": explanation_bundle.get("lime_method", "fallback"),
             "land_area": land_area,
             "land_unit": land_unit,
             "estimated_yield": estimated_yield,
@@ -2031,6 +2603,11 @@ def crop_prediction():
             top3_predictions_raw=top3_predictions,
             explanation=explanation_display,
             explanations=explanations_display,
+            lime_explanation=lime_explanation_display,
+            lime_explanations=lime_explanations_display,
+            xai_consensus_summary=xai_consensus_summary,
+            shap_method=explanation_bundle.get("shap_method", "fallback"),
+            lime_method=explanation_bundle.get("lime_method", "fallback"),
             overall_summary=overall_summary,
             land_area=land_area,
             land_unit_display=land_unit_display,
@@ -2049,7 +2626,6 @@ def crop_prediction():
             current_season=translate_season_name(current_season, lang),
             current_season_raw=current_season,
             sowing_guidance=sowing_guidance,
-            model_info=get_model_info(lang),
             show_feedback_prompt=feedback_prompt["show_feedback_prompt"],
             feedback_status=False,
             feedback_prediction_type="crop",
@@ -2077,7 +2653,7 @@ def fert_recommend():
         lang = get_lang()
 
         df = get_fertilizer_reference_df()
-        validated_input = validate_fertilizer_form_input(request.form, df)
+        validated_input = validate_fertilizer_form_input(request.form, df, lang=lang)
         crop_name = validated_input["crop_name"]
         N = validated_input["N"]
         P = validated_input["P"]

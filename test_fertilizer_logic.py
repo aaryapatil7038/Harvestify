@@ -96,6 +96,24 @@ class FertilizerLogicTests(unittest.TestCase):
         self.assertIn("Top-dress urea", vegetative_text)
         self.assertIn("Urea total", quantity_text)
 
+    def test_marathi_plan_localizes_generated_sections(self):
+        plan = build_fertilizer_plan(
+            crop_name="jowar",
+            reference_n=60,
+            reference_p=33,
+            reference_k=33,
+            actual_n=45,
+            actual_p=45,
+            actual_k=45,
+            lang="mr"
+        )
+
+        self.assertEqual(plan["crop_name"], "ज्वारी")
+        self.assertIn("मुख्य अन्नद्रव्य मुद्दा", plan["summary"])
+        self.assertTrue(any("माती" in line for line in plan["status_lines"]))
+        self.assertTrue(any("युरिया" in line for line in plan["basal_lines"] + plan["vegetative_lines"] + plan["flowering_lines"] + plan["quantity_lines"]))
+        self.assertIn("अंदाजित योजना", plan["note"])
+
 
 if __name__ == "__main__":
     unittest.main()

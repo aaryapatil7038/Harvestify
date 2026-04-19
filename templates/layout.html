@@ -34,7 +34,8 @@
 	<link href="{{ url_for('static', filename='css/bootstrap.css') }}" rel="stylesheet" type="text/css" />
 	<link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet" type="text/css" />
 	<link href="{{ url_for('static', filename='css/font-awesome.min.css') }}" rel="stylesheet">
-	<link href="{{ url_for('static', filename='css/custom-ui.css') }}" rel="stylesheet" type="text/css" />
+	<link href="{{ url_for('static', filename='css/custom-ui.css', v='20260419-scale-down-pass-2') }}" rel="stylesheet" type="text/css" />
+	{% block extra_head %}{% endblock %}
 
 	<script type="text/JavaScript" src="{{ url_for('static', filename='scripts/cities.js') }}"></script>
 
@@ -43,6 +44,7 @@
 </head>
 
 <body>
+	{% set current_path = request.full_path[:-1] if request.full_path.endswith('?') else request.full_path %}
 	<div class="bg-orb orb-one"></div>
 	<div class="bg-orb orb-two"></div>
 	<div class="bg-grid"></div>
@@ -56,7 +58,11 @@
 
 			<button class="navbar-toggler clean-toggler" type="button" data-toggle="collapse" data-target="#navbarResponsive"
 				aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation">
-				<span class="navbar-toggler-icon"></span>
+				<span class="clean-toggler-icon" aria-hidden="true">
+					<span></span>
+					<span></span>
+					<span></span>
+				</span>
 			</button>
 
 			<div class="collapse navbar-collapse" id="navbarResponsive">
@@ -79,6 +85,7 @@
 					</li>
 				</ul>
 
+				<div class="navbar-tools">
 				<div class="lang-toggle-navbar">
 					<span class="lang-label">{{ ui.language if ui else 'Language' }}:</span>
 					<div class="lang-toggle">
@@ -90,6 +97,21 @@
 						</button>
 					</div>
 				</div>
+				<div
+					class="farm-chat-widget"
+					id="farmChatWidget"
+					data-endpoint="{{ url_for('farm_chat', lang=lang) }}"
+					data-welcome="{% if lang == 'mr' %}à¤¨à¤®à¤¸à¥à¤•à¤¾à¤°. à¤®à¥€ à¤¤à¥à¤®à¤šà¤¾ à¤®à¥‹à¤«à¤¤ à¤¶à¥‡à¤¤ à¤¸à¤¹à¤¾à¤¯à¥à¤¯à¤• à¤†à¤¹à¥‡. à¤®à¥€ à¤¤à¥à¤®à¤šà¥€ à¤¸à¥‡à¤µà¥à¤¹ à¤•à¥‡à¤²à¥‡à¤²à¥€ à¤¶à¥‡à¤¤à¤‚, à¤…à¤²à¥€à¤•à¤¡à¥€à¤² prediction à¤†à¤£à¤¿ à¤¶à¥‡à¤µà¤Ÿà¤šà¥‡ crop à¤•à¤¿à¤‚à¤µà¤¾ fertilizer result à¤µà¤¾à¤ªà¤°à¥‚à¤¨ à¤®à¤¦à¤¤ à¤•à¤°à¥‚ à¤¶à¤•à¤¤à¥‹.{% else %}Hello. I am your free farm assistant. I can use your saved farms, recent predictions, and latest crop or fertilizer result to help you inside this app.{% endif %}"
+					data-placeholder="{% if lang == 'mr' %}à¤ªà¥€à¤•, à¤–à¤¤, à¤¹à¤µà¤¾à¤®à¤¾à¤¨ à¤•à¤¿à¤‚à¤µà¤¾ à¤¤à¥à¤®à¤šà¥à¤¯à¤¾ à¤‡à¤¤à¤¿à¤¹à¤¾à¤¸à¤¾à¤¬à¤¦à¥à¤¦à¤² à¤µà¤¿à¤šà¤¾à¤°à¤¾{% else %}Ask about crops, fertilizer, weather, or your history{% endif %}"
+					data-send="{% if lang == 'mr' %}à¤ªà¤¾à¤ à¤µà¤¾{% else %}Send{% endif %}"
+					data-title="{% if lang == 'mr' %}à¤¶à¥‡à¤¤ à¤¸à¤¹à¤¾à¤¯à¥à¤¯à¤•{% else %}Farm Assistant{% endif %}"
+					data-subtitle="{% if lang == 'mr' %}à¤®à¥‹à¤«à¤¤ à¤šà¥…à¤Ÿà¤¬à¥‰à¤Ÿ: à¤¶à¥‡à¤¤à¥€ à¤ªà¥à¤°à¤¶à¥à¤¨, à¤…à¥…à¤ª à¤®à¤¦à¤¤ à¤†à¤£à¤¿ à¤¤à¥à¤®à¤šà¤¾ à¤‡à¤¤à¤¿à¤¹à¤¾à¤¸{% else %}Free chatbot for farming questions, app help, and your history{% endif %}"
+					data-toggle="{% if lang == 'mr' %}à¤¶à¥‡à¤¤ à¤¸à¤¹à¤¾à¤¯à¥à¤¯à¤•{% else %}Farm Assistant{% endif %}"
+					data-clear="{% if lang == 'mr' %}à¤°à¥€à¤¸à¥‡à¤Ÿ{% else %}Reset{% endif %}"
+					data-thinking="{% if lang == 'mr' %}à¤µà¤¿à¤šà¤¾à¤° à¤•à¤°à¤¤ à¤†à¤¹à¥‡...{% else %}Thinking...{% endif %}"
+				></div>
+				</div>
+
 			</div>
 		</div>
 	</nav>
@@ -109,6 +131,11 @@
 						Crop guidance, fertilizer support, and field-ready insights in one simple workspace.
 					{% endif %}
 				</p>
+				{% if request.endpoint == 'home' and home_model_info %}
+				<p class="footer-copy" style="font-size: 12px; opacity: 0.72; margin-top: 6px;">
+					{{ home_model_info.version_label }} {{ home_model_info.version }} | {{ home_model_info.last_trained_label }} {{ home_model_info.last_trained }} | {{ home_model_info.region }}
+				</p>
+				{% endif %}
 			</div>
 			<div class="footer-links">
 				<a href="{{ url_for('home', lang=lang) }}">{% if lang == 'mr' %}मुख्यपृष्ठ{% else %}Home{% endif %}</a>
@@ -128,6 +155,473 @@
 			window.location.href = currentUrl.toString();
 		}
 	</script>
+
+	<script>
+		(function () {
+			const storageKey = "harvestifyInitialLocationPromptV1";
+			const shouldAutoPromptOnPage = {{ (request.endpoint == 'home')|tojson }};
+
+			try {
+				if (!shouldAutoPromptOnPage || !window.isSecureContext || !("permissions" in navigator) || !("geolocation" in navigator)) {
+					return;
+				}
+
+				const existingState = localStorage.getItem(storageKey);
+
+				if (existingState === "granted" || existingState === "denied" || existingState === "requested") {
+					return;
+				}
+
+				navigator.permissions.query({ name: "geolocation" }).then(function (result) {
+					const state = result && result.state ? result.state : "unknown";
+
+					if (state === "granted" || state === "denied") {
+						localStorage.setItem(storageKey, state);
+						return;
+					}
+
+					if (state !== "prompt") {
+						localStorage.setItem(storageKey, state);
+						return;
+					}
+
+					localStorage.setItem(storageKey, "requested");
+
+					navigator.geolocation.getCurrentPosition(
+						function () {
+							localStorage.setItem(storageKey, "granted");
+						},
+						function (error) {
+							if (error && error.code === error.PERMISSION_DENIED) {
+								localStorage.setItem(storageKey, "denied");
+								return;
+							}
+
+							localStorage.removeItem(storageKey);
+						},
+						{
+							enableHighAccuracy: true,
+							timeout: 10000
+						}
+					);
+				}).catch(function () {
+					return null;
+				});
+			} catch (error) {
+				return;
+			}
+		})();
+	</script>
+
+	<script>
+		(function () {
+			const widget = document.getElementById("farmChatWidget");
+			if (!widget || !window.fetch) {
+				return;
+			}
+
+			const storageKeys = {
+				savedFarms: "savedFarms",
+				recentPredictions: "harvestifyRecentPredictionsV1",
+				weatherCache: "harvestifyWeatherCacheV1",
+				chatHistory: "harvestifyFarmChatMessagesV1"
+			};
+
+			function safeReadJSON(key, fallback) {
+				try {
+					const rawValue = localStorage.getItem(key);
+					return rawValue ? JSON.parse(rawValue) : fallback;
+				} catch (error) {
+					return fallback;
+				}
+			}
+
+			function safeWriteJSON(key, value) {
+				try {
+					localStorage.setItem(key, JSON.stringify(value));
+				} catch (error) {
+					return;
+				}
+			}
+
+			widget.innerHTML = [
+				'<button type="button" class="farm-chat-toggle" id="farmChatToggle">',
+				'  <span>' + widget.dataset.toggle + '</span>',
+				'</button>'
+			].join("");
+
+			const existingPanel = document.getElementById("farmChatPanel");
+			if (existingPanel && existingPanel.parentNode) {
+				existingPanel.parentNode.removeChild(existingPanel);
+			}
+
+			const existingBackdrop = document.getElementById("farmChatBackdrop");
+			if (existingBackdrop && existingBackdrop.parentNode) {
+				existingBackdrop.parentNode.removeChild(existingBackdrop);
+			}
+
+			const backdrop = document.createElement("div");
+			backdrop.className = "farm-chat-backdrop";
+			backdrop.id = "farmChatBackdrop";
+			document.body.appendChild(backdrop);
+
+			const panel = document.createElement("div");
+			panel.className = "farm-chat-panel";
+			panel.id = "farmChatPanel";
+			panel.innerHTML = [
+				'<div class="farm-chat-header">',
+				'  <div class="farm-chat-header-top">',
+				'    <div class="farm-chat-title-block">',
+				'      <span class="farm-chat-kicker">AI assistant</span>',
+				'      <h3 class="farm-chat-title">' + widget.dataset.title + '</h3>',
+				'    </div>',
+				'    <div class="farm-chat-header-actions">',
+				'      <button type="button" class="farm-chat-clear" id="farmChatClear">' + widget.dataset.clear + '</button>',
+				'      <button type="button" class="farm-chat-close" id="farmChatClose" aria-label="Close">&times;</button>',
+				'    </div>',
+				'  </div>',
+				'</div>',
+				'<div class="farm-chat-messages" id="farmChatMessages"></div>',
+				'<div class="farm-chat-suggestions" id="farmChatSuggestions"></div>',
+				'<div class="farm-chat-status" id="farmChatStatus" aria-live="polite"></div>',
+				'<div class="farm-chat-input-row">',
+				'  <button type="button" class="farm-chat-mic" id="farmChatMic" aria-label="Use voice input" title="Use voice input">',
+				'    <svg class="farm-chat-button-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">',
+				'      <path d="M12 14.5a3 3 0 0 0 3-3V8a3 3 0 0 0-6 0v3.5a3 3 0 0 0 3 3Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>',
+				'      <path d="M6.5 10.75v.75a5.5 5.5 0 0 0 11 0v-.75M12 17v3M9 20h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>',
+				'    </svg>',
+				'  </button>',
+				'  <textarea class="farm-chat-input" id="farmChatInput" rows="1" placeholder="' + widget.dataset.placeholder + '"></textarea>',
+				'  <button type="button" class="farm-chat-send" id="farmChatSend" aria-label="' + widget.dataset.send + '" title="' + widget.dataset.send + '">',
+				'    <svg class="farm-chat-button-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">',
+				'      <path d="M12 18V7M7.75 11.25 12 7l4.25 4.25" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"></path>',
+				'    </svg>',
+				'  </button>',
+				'</div>'
+			].join("");
+			document.body.appendChild(panel);
+
+			const toggleButton = document.getElementById("farmChatToggle");
+			const messagesNode = document.getElementById("farmChatMessages");
+			const suggestionsNode = document.getElementById("farmChatSuggestions");
+			const statusNode = document.getElementById("farmChatStatus");
+			const micButton = document.getElementById("farmChatMic");
+			const input = document.getElementById("farmChatInput");
+			const sendButton = document.getElementById("farmChatSend");
+			const clearButton = document.getElementById("farmChatClear");
+			const closeButton = document.getElementById("farmChatClose");
+			const endpoint = widget.dataset.endpoint;
+			const voiceLocale = {{ ("mr-IN" if lang == "mr" else "en-IN") | tojson }};
+			const voiceCopy = {{ ({
+				"start": "बोला" if lang == "mr" else "Speak",
+				"stop": "Stop" if lang == "mr" else "Stop",
+				"listening": "ऐकत आहे... तुमचा प्रश्न बोला." if lang == "mr" else "Listening... say your question.",
+				"ready": "तुमचा आवाज पकडला. पाठवत आहे..." if lang == "mr" else "Captured your voice. Sending...",
+				"noSpeech": "आवाज ऐकू आला नाही. पुन्हा प्रयत्न करा." if lang == "mr" else "I could not hear anything. Please try again.",
+				"unsupported": "या browser मध्ये voice input उपलब्ध नाही." if lang == "mr" else "Voice input is not available in this browser.",
+				"denied": "Mic permission नाकारली गेली. Browser settings तपासा." if lang == "mr" else "Microphone permission was denied. Please check your browser settings.",
+				"error": "Voice input सुरू करता आला नाही. पुन्हा प्रयत्न करा." if lang == "mr" else "Could not start voice input. Please try again."
+			}) | tojson }};
+			const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+			const defaultSuggestions = {{ ([
+				"माझी शेवटची पीक शिफारस कोणती होती?",
+				"माझी सेव्ह केलेली शेतं दाखवा",
+				"पीक prediction कसे वापरायचे?",
+				"खरीप आणि रब्बी समजावून सांगा"
+			] if lang == 'mr' else [
+				"What was my last crop recommendation?",
+				"Show my saved farms",
+				"How do I use crop prediction?",
+				"Explain Kharif and Rabi"
+			]) | tojson }};
+
+			function escapeHtml(value) {
+				return String(value || "")
+					.replace(/&/g, "&amp;")
+					.replace(/</g, "&lt;")
+					.replace(/>/g, "&gt;")
+					.replace(/"/g, "&quot;")
+					.replace(/'/g, "&#39;");
+			}
+
+			function getClientContext() {
+				const weatherSnapshots = safeReadJSON(storageKeys.weatherCache, []);
+				return {
+					page: window.location.pathname,
+					savedFarms: safeReadJSON(storageKeys.savedFarms, []).slice(0, 5),
+					recentPredictions: safeReadJSON(storageKeys.recentPredictions, []).slice(0, 5),
+					latestWeather: weatherSnapshots.length ? weatherSnapshots[0] : {}
+				};
+			}
+
+			function getStoredMessages() {
+				const stored = safeReadJSON(storageKeys.chatHistory, []);
+				return Array.isArray(stored) ? stored.slice(0, 16) : [];
+			}
+
+			function setStoredMessages(messages) {
+				safeWriteJSON(storageKeys.chatHistory, Array.isArray(messages) ? messages.slice(-16) : []);
+			}
+
+			let recognition = null;
+			let isListening = false;
+			let shouldSendVoiceMessage = false;
+
+			function setVoiceStatus(message, isError) {
+				const text = String(message || "").trim();
+				statusNode.textContent = text;
+				statusNode.classList.toggle("is-visible", Boolean(text));
+				statusNode.classList.toggle("is-error", Boolean(text) && Boolean(isError));
+			}
+
+			function syncMicButton() {
+				if (!micButton) {
+					return;
+				}
+				micButton.classList.toggle("is-listening", isListening);
+				micButton.setAttribute("aria-pressed", isListening ? "true" : "false");
+				micButton.setAttribute("aria-label", isListening ? voiceCopy.stop : voiceCopy.start);
+				micButton.setAttribute("title", isListening ? voiceCopy.stop : voiceCopy.start);
+			}
+
+			function stopVoiceCapture(cancelSend) {
+				if (cancelSend) {
+					shouldSendVoiceMessage = false;
+				}
+				if (recognition && isListening) {
+					recognition.stop();
+				}
+			}
+
+			function setSuggestions(items) {
+				const entries = Array.isArray(items) ? items.slice(0, 4) : [];
+				suggestionsNode.innerHTML = entries.map(function (item) {
+					return '<button type="button" class="farm-chat-chip">' + escapeHtml(item) + '</button>';
+				}).join("");
+
+				suggestionsNode.querySelectorAll(".farm-chat-chip").forEach(function (button) {
+					button.addEventListener("click", function () {
+						input.value = button.textContent;
+						sendCurrentMessage();
+					});
+				});
+			}
+
+			function renderMessages() {
+				const messages = getStoredMessages();
+				messagesNode.innerHTML = messages.map(function (message) {
+					const roleClass = message.role === "user" ? "user" : "assistant";
+					return '<div class="farm-chat-message ' + roleClass + '">' + escapeHtml(message.content) + '</div>';
+				}).join("");
+				messagesNode.scrollTop = messagesNode.scrollHeight;
+			}
+
+			function addMessage(role, content) {
+				const messages = getStoredMessages();
+				messages.push({
+					role: role,
+					content: String(content || "").trim()
+				});
+				setStoredMessages(messages);
+				renderMessages();
+			}
+
+			if (SpeechRecognitionCtor) {
+				recognition = new SpeechRecognitionCtor();
+				recognition.lang = voiceLocale;
+				recognition.interimResults = true;
+				recognition.maxAlternatives = 1;
+				recognition.continuous = false;
+
+				recognition.onstart = function () {
+					isListening = true;
+					shouldSendVoiceMessage = true;
+					setVoiceStatus(voiceCopy.listening, false);
+					syncMicButton();
+				};
+
+				recognition.onresult = function (event) {
+					const transcriptParts = [];
+					for (let index = 0; index < event.results.length; index += 1) {
+						transcriptParts.push(event.results[index][0].transcript);
+					}
+					if (transcriptParts.length) {
+						input.value = transcriptParts.join(" ").replace(/\s+/g, " ").trim();
+					}
+				};
+
+				recognition.onerror = function (event) {
+					shouldSendVoiceMessage = false;
+					if (event && event.error === "not-allowed") {
+						setVoiceStatus(voiceCopy.denied, true);
+					} else if (event && event.error === "no-speech") {
+						setVoiceStatus(voiceCopy.noSpeech, true);
+					} else {
+						setVoiceStatus(voiceCopy.error, true);
+					}
+				};
+
+				recognition.onend = function () {
+					const capturedMessage = String(input.value || "").trim();
+					const shouldSend = shouldSendVoiceMessage && Boolean(capturedMessage);
+					isListening = false;
+					shouldSendVoiceMessage = false;
+					syncMicButton();
+					if (shouldSend) {
+						setVoiceStatus(voiceCopy.ready, false);
+						sendCurrentMessage();
+					} else if (!statusNode.classList.contains("is-error")) {
+						setVoiceStatus("", false);
+					}
+				};
+			} else if (micButton) {
+				micButton.disabled = true;
+				micButton.setAttribute("title", voiceCopy.unsupported);
+			}
+
+			function openPanel() {
+				backdrop.classList.add("is-open");
+				panel.classList.add("is-open");
+				document.body.classList.add("chat-open");
+				document.documentElement.classList.add("chat-open");
+			}
+
+			function closePanel() {
+				stopVoiceCapture(true);
+				backdrop.classList.remove("is-open");
+				panel.classList.remove("is-open");
+				document.body.classList.remove("chat-open");
+				document.documentElement.classList.remove("chat-open");
+			}
+
+			function setBusy(isBusy) {
+				sendButton.disabled = isBusy;
+				toggleButton.disabled = isBusy;
+				if (micButton) {
+					micButton.disabled = isBusy || !SpeechRecognitionCtor;
+				}
+			}
+
+			async function resetChat() {
+				setBusy(true);
+				setStoredMessages([]);
+				try {
+					const response = await fetch(endpoint, {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({ action: "reset" })
+					});
+					const payload = await response.json();
+					if (payload && payload.reply) {
+						addMessage("assistant", payload.reply);
+					}
+					setSuggestions(payload && payload.suggestions ? payload.suggestions : []);
+				} catch (error) {
+					addMessage("assistant", widget.dataset.welcome);
+				} finally {
+					setBusy(false);
+				}
+			}
+
+			async function sendCurrentMessage() {
+				const message = String(input.value || "").trim();
+				if (!message) {
+					return;
+				}
+				setVoiceStatus("", false);
+				if (isListening) {
+					stopVoiceCapture(true);
+				}
+
+				addMessage("user", message);
+				input.value = "";
+				openPanel();
+				setBusy(true);
+
+				try {
+					const response = await fetch(endpoint, {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({
+							message: message,
+							client_context: getClientContext()
+						})
+					});
+					const payload = await response.json();
+					addMessage("assistant", payload && payload.reply ? payload.reply : widget.dataset.welcome);
+					setSuggestions(payload && payload.suggestions ? payload.suggestions : []);
+				} catch (error) {
+					addMessage("assistant", widget.dataset.welcome);
+				} finally {
+					setBusy(false);
+				}
+			}
+
+			toggleButton.addEventListener("click", function () {
+				if (panel.classList.contains("is-open")) {
+					closePanel();
+				} else {
+					openPanel();
+					renderMessages();
+					input.focus();
+				}
+			});
+
+			panel.addEventListener("click", function (event) {
+				event.stopPropagation();
+			});
+
+			widget.addEventListener("click", function (event) {
+				event.stopPropagation();
+			});
+
+			sendButton.addEventListener("click", sendCurrentMessage);
+			clearButton.addEventListener("click", resetChat);
+			closeButton.addEventListener("click", closePanel);
+			backdrop.addEventListener("click", closePanel);
+			micButton.addEventListener("click", function () {
+				if (!recognition) {
+					setVoiceStatus(voiceCopy.unsupported, true);
+					return;
+				}
+				if (isListening) {
+					stopVoiceCapture(true);
+					return;
+				}
+				setVoiceStatus("", false);
+				openPanel();
+				input.focus();
+				try {
+					recognition.start();
+				} catch (error) {
+					setVoiceStatus(voiceCopy.error, true);
+				}
+			});
+
+			input.addEventListener("keydown", function (event) {
+				if (event.key === "Enter" && !event.shiftKey) {
+					event.preventDefault();
+					sendCurrentMessage();
+				}
+			});
+
+			document.addEventListener("keydown", function (event) {
+				if (event.key === "Escape" && panel.classList.contains("is-open")) {
+					closePanel();
+				}
+			});
+
+			if (!getStoredMessages().length) {
+				setStoredMessages([{ role: "assistant", content: widget.dataset.welcome }]);
+			}
+
+			syncMicButton();
+			renderMessages();
+			setSuggestions(defaultSuggestions);
+		})();
+	</script>
+
+	{% block extra_scripts %}{% endblock %}
 
 	<script>
 		if ("serviceWorker" in navigator) {

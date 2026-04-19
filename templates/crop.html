@@ -53,7 +53,7 @@
     .hero {
         position: relative;
         overflow: hidden;
-        padding: 28px 0 20px;
+        padding: 18px 0 12px;
     }
 
     .hero::before {
@@ -75,8 +75,8 @@
     .hero-card {
         max-width: 980px;
         margin: 0 auto;
-        padding: 34px;
-        border-radius: 28px;
+        padding: 18px 20px;
+        border-radius: 24px;
         background: linear-gradient(145deg, rgba(255,255,255,0.92), rgba(251,246,238,0.95));
         border: 1px solid rgba(24, 48, 40, 0.10);
         backdrop-filter: blur(16px);
@@ -88,21 +88,21 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        padding: 9px 16px;
+        padding: 7px 13px;
         border-radius: 999px;
         background: rgba(40, 89, 67, 0.10);
         color: var(--green);
-        font-size: 0.76rem;
+        font-size: 0.7rem;
         font-weight: 800;
-        margin-bottom: 14px;
+        margin-bottom: 10px;
         text-transform: uppercase;
         letter-spacing: 0.14em;
     }
 
     .hero-title {
-        margin: 0 0 10px;
-        font-size: clamp(2rem, 3vw, 2.6rem);
-        line-height: 1.08;
+        margin: 0 0 8px;
+        font-size: clamp(1.45rem, 2vw, 1.78rem);
+        line-height: 1.05;
         letter-spacing: -0.03em;
     }
 
@@ -110,20 +110,20 @@
         margin: 0;
         max-width: 760px;
         color: #516074;
-        font-size: 1rem;
-        line-height: 1.8;
+        font-size: 0.86rem;
+        line-height: 1.48;
     }
 
     .hero-stats {
-        margin-top: 24px;
+        margin-top: 14px;
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 14px;
+        gap: 10px;
     }
 
     .hero-stat {
-        padding: 18px;
-        border-radius: 18px;
+        padding: 10px 12px;
+        border-radius: 14px;
         background: rgba(255,255,255,0.80);
         border: 1px solid rgba(24, 48, 40, 0.08);
         box-shadow: var(--shadow-sm);
@@ -132,17 +132,18 @@
     .hero-stat small {
         display: block;
         color: var(--muted);
-        font-size: 0.85rem;
-        margin-bottom: 6px;
+        font-size: 0.74rem;
+        margin-bottom: 4px;
     }
 
     .hero-stat strong {
-        font-size: 0.98rem;
+        font-size: 0.84rem;
         font-weight: 700;
+        line-height: 1.45;
     }
 
     .page-section {
-        padding: 14px 0 70px;
+        padding: 10px 0 36px;
     }
 
     .main-card {
@@ -151,24 +152,24 @@
         border-radius: var(--radius-xl);
         box-shadow: var(--shadow-md);
         backdrop-filter: blur(16px);
-        padding: 30px;
+        padding: 20px;
     }
 
     .section-chip {
         display: inline-flex;
         align-items: center;
-        padding: 8px 12px;
+        padding: 6px 10px;
         border-radius: 999px;
         background: var(--green-soft);
         color: var(--green);
-        font-size: 0.82rem;
+        font-size: 0.74rem;
         font-weight: 800;
         margin-bottom: 12px;
     }
 
     .main-title {
         margin: 0 0 8px;
-        font-size: 1.9rem;
+        font-size: 1.38rem;
         line-height: 1.15;
         letter-spacing: -0.03em;
     }
@@ -176,18 +177,18 @@
     .main-subtitle {
         margin: 0;
         color: var(--muted);
-        line-height: 1.7;
-        font-size: 0.98rem;
+        line-height: 1.5;
+        font-size: 0.88rem;
     }
 
     .form-section {
-        margin-top: 24px;
+        margin-top: 16px;
     }
 
     .form-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 18px;
+        gap: 12px;
     }
 
     .field {
@@ -197,7 +198,7 @@
     }
 
     .field label {
-        font-size: 0.95rem;
+        font-size: 0.84rem;
         font-weight: 700;
         color: #223146;
     }
@@ -205,13 +206,13 @@
     .field input,
     .field select {
         width: 100%;
-        height: 58px;
-        padding: 0 18px;
+        height: 48px;
+        padding: 0 14px;
         border-radius: 16px;
         border: 1px solid rgba(23,34,53,0.10);
         background: rgba(255,255,255,0.90);
         color: var(--text);
-        font-size: 0.98rem;
+        font-size: 0.9rem;
         outline: none;
         transition: var(--transition);
     }
@@ -228,9 +229,9 @@
     }
 
     .sub-card {
-        margin-top: 24px;
-        padding: 22px;
-        border-radius: 24px;
+        margin-top: 16px;
+        padding: 16px;
+        border-radius: 20px;
         background: rgba(255,255,255,0.72);
         border: 1px solid rgba(23,34,53,0.08);
         box-shadow: var(--shadow-sm);
@@ -247,13 +248,13 @@
 
     .sub-card-header h3 {
         margin: 0;
-        font-size: 1.24rem;
+        font-size: 1.1rem;
         letter-spacing: -0.02em;
     }
 
     .sub-card-header span {
         color: var(--muted);
-        font-size: 0.9rem;
+        font-size: 0.84rem;
     }
 
     .method-toggle {
@@ -580,7 +581,7 @@
         top: calc(var(--drawer-top-offset) + var(--drawer-gap));
         left: 0;
         width: 76px;
-        max-width: min(460px, calc(100vw - 8px));
+        max-width: min(520px, calc(100vw - 8px));
         height: calc(100vh - var(--drawer-top-offset) - (var(--drawer-gap) * 1.5));
         background: rgba(248, 244, 237, 0.96);
         backdrop-filter: blur(18px);
@@ -599,7 +600,7 @@
     }
 
     .side-drawer.open {
-        width: min(460px, calc(100vw - 8px));
+        width: min(520px, calc(100vw - 8px));
     }
 
     .sidebar-rail {
@@ -922,9 +923,70 @@
         display: none;
     }
 
+    @media (max-width: 1180px) {
+        .crop-page {
+            padding-left: 72px;
+        }
+
+        .crop-page .container {
+            width: min(1000px, calc(100% - 28px));
+        }
+
+        .hero-card,
+        .main-card {
+            padding: 28px;
+        }
+
+        .hero-stats,
+        .location-info-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: 1024px) {
+        .hero-title {
+            font-size: clamp(1.55rem, 4.8vw, 1.95rem);
+        }
+
+        .hero-text,
+        .main-subtitle {
+            font-size: 0.9rem;
+            line-height: 1.55;
+        }
+
+        .hero-stats,
+        .form-grid,
+        .method-toggle,
+        .save-row,
+        .saved-selector-row,
+        .location-info-grid,
+        .weather-grid,
+        .offline-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
     @media (max-width: 900px) {
         .crop-page {
             padding-left: 0;
+        }
+
+        .hero-card,
+        .main-card,
+        .sub-card {
+            padding: 22px;
+            border-radius: 22px;
+        }
+
+        .hero-title {
+            font-size: clamp(1.45rem, 5.2vw, 1.8rem);
+        }
+
+        .hero-text,
+        .main-subtitle,
+        .section-note {
+            font-size: 0.86rem;
+            line-height: 1.5;
         }
 
         .hero-stats,
@@ -981,12 +1043,78 @@
 
         .hero-card,
         .main-card {
-            padding: 20px;
+            padding: 16px;
+        }
+
+        .hero-title {
+            font-size: clamp(1.28rem, 5.8vw, 1.65rem);
+            line-height: 1.08;
+        }
+
+        .hero-text,
+        .main-subtitle {
+            font-size: 0.8rem;
+            line-height: 1.42;
+        }
+
+        .hero-stats,
+        .form-grid,
+        .location-info-grid,
+        .weather-grid,
+        .offline-grid,
+        .recent-predictions-grid {
+            gap: 10px;
+        }
+
+        .hero-stat,
+        .sub-card,
+        .offline-card,
+        .weather-card {
+            padding: 14px;
+        }
+
+        .hero-stat {
+            padding: 10px;
+        }
+
+        .field input,
+        .field select {
+            height: 48px;
+            padding: 0 12px;
+            font-size: 0.92rem;
+        }
+
+        .field label,
+        .sub-card-header span,
+        .hero-stat small {
+            font-size: 0.84rem;
+        }
+
+        .section-chip,
+        .hero-badge {
+            letter-spacing: 0.08em;
+            font-size: 0.72rem;
+            padding: 7px 11px;
+        }
+
+        .main-title,
+        .sub-card-header h3 {
+            font-size: 1.18rem;
+        }
+
+        .primary-btn,
+        .secondary-btn {
+            height: 46px;
+            font-size: 0.92rem;
         }
 
         .primary-btn {
             width: 100%;
             min-width: unset;
+        }
+
+        #farmMap {
+            height: 260px;
         }
 
         .side-drawer {
@@ -1003,7 +1131,14 @@
         <span data-key="geolocationNotSupported">{% if lang == 'mr' %}या ब्राउझरमध्ये geolocation उपलब्ध नाही.{% else %}Geolocation is not supported in this browser.{% endif %}</span>
         <span data-key="fetchingCurrentLocation">{% if lang == 'mr' %}सध्याचे स्थान आणि हवामान मिळवत आहे...{% else %}Fetching current location and weather details...{% endif %}</span>
         <span data-key="currentLocationDenied">{% if lang == 'mr' %}सध्याचे स्थान मिळाले नाही. कृपया location access द्या.{% else %}Current location not received. Please allow location access.{% endif %}</span>
+        <span data-key="locationPopupSecureTitle">{% if lang == 'mr' %}Secure location access आवश्यक आहे{% else %}Secure location access required{% endif %}</span>
+        <span data-key="locationPopupSecureText">{% if lang == 'mr' %}Current Location वापरण्यासाठी ही साइट HTTPS किंवा localhost वर उघडा. सध्या ब्राउझर location permission देत नाही.{% else %}Open this site on HTTPS or localhost to use Current Location. The browser will not grant location access on the current page.{% endif %}</span>
+        <span data-key="locationPopupUnavailableText">{% if lang == 'mr' %}सध्या location मिळू शकले नाही. थोड्या वेळाने पुन्हा प्रयत्न करा किंवा manual mode वापरा.{% else %}We could not read your location right now. Please try again in a moment or switch to manual mode.{% endif %}</span>
+        <span data-key="locationPopupTimeoutText">{% if lang == 'mr' %}Location request ला जास्त वेळ लागला. पुन्हा प्रयत्न करा किंवा manual mode वापरा.{% else %}The location request took too long. Please try again or switch to manual mode.{% endif %}</span>
         <span data-key="manualModeEnabled">{% if lang == 'mr' %}Manual mode सुरू झाले. स्थान टाका किंवा नकाशावर थेट क्लिक करा.{% else %}Manual mode enabled. Enter location or click directly on the map.{% endif %}</span>
+        <span data-key="selectLocationMethodFirst">{% if lang == 'mr' %}कृपया आधी location method निवडा.{% else %}Please choose a location method first.{% endif %}</span>
+        <span data-key="locationPermissionBlockedStatus">{% if lang == 'mr' %}या साइटसाठी location access block झाले आहे. Manual mode वापरा किंवा browser settings मध्ये ते allow करा.{% else %}Location access is blocked for this site. Use manual mode or allow it in the browser settings.{% endif %}</span>
+        <span data-key="locationPermissionSecureStatus">{% if lang == 'mr' %}Current Location वापरण्यासाठी ही साइट HTTPS किंवा localhost वर उघडा.{% else %}Open this site on HTTPS or localhost to use Current Location.{% endif %}</span>
         <span data-key="selectLocationFirst">{% if lang == 'mr' %}कृपया आधी शेताचे स्थान निवडा.{% else %}Please select farm location first.{% endif %}</span>
         <span data-key="fetchWeatherFirst">{% if lang == 'mr' %}Prediction करण्यापूर्वी हवामानाची माहिती मिळवा.{% else %}Please fetch weather details before prediction.{% endif %}</span>
         <span data-key="saveFarmBefore">{% if lang == 'mr' %}सेव्ह करण्यापूर्वी शेताचे नाव आणि योग्य स्थान निवडा.{% else %}Enter farm name and select a valid location before saving.{% endif %}</span>
@@ -1087,7 +1222,7 @@
 
                 <form action="{{ url_for('crop_prediction') }}" method="POST" id="cropForm" class="form-section">
                     <input type="hidden" name="lang" value="{{ lang }}">
-                    <input type="hidden" name="location_method" id="location_method" value="current">
+                    <input type="hidden" name="location_method" id="location_method" value="">
                     <input type="hidden" name="latitude" id="latitude">
                     <input type="hidden" name="longitude" id="longitude">
                     <input type="hidden" name="weather_city" id="weatherCityInput">
@@ -1158,7 +1293,7 @@
                         </div>
 
                         <div class="method-toggle">
-                            <button type="button" class="toggle-btn active" id="currentLocationBtn">{{ ui.use_current_location }}</button>
+                            <button type="button" class="toggle-btn" id="currentLocationBtn">{{ ui.use_current_location }}</button>
                             <button type="button" class="toggle-btn" id="manualLocationBtn">{{ ui.enter_location_manually }}</button>
                         </div>
 
@@ -1222,14 +1357,6 @@
                             <input type="text" id="farmName" placeholder="{% if lang == 'mr' %}शेताचे नाव टाका{% else %}Enter farm name{% endif %}">
                             <button type="button" id="saveFarmBtn" class="secondary-btn">{% if lang == 'mr' %}सेव्ह करा{% else %}Save Farm{% endif %}</button>
                         </div>
-
-                        <p class="helper-text">
-                            {% if lang == 'mr' %}
-                                शेताचे नाव, अक्षांश, रेखांश आणि स्थानाची माहिती फक्त या ब्राउझरमध्ये सेव्ह केली जाईल.
-                            {% else %}
-                                Saves farm name, latitude, longitude, and location text in this browser only.
-                            {% endif %}
-                        </p>
                     </div>
 
                     <div class="action-row">
@@ -1917,21 +2044,41 @@
             statusBox.style.display = show ? "block" : "none";
         }
 
+        function fallbackToManualLocation(statusKey) {
+            setMethod("manual");
+            clearFetchedWeather();
+            persistDraft();
+            setStatus(t(statusKey || "manualModeEnabled"));
+            setTimeout(function () {
+                if (manualLocationInput) {
+                    manualLocationInput.focus();
+                }
+            }, 0);
+        }
+
         function setMethod(method, options) {
             const config = Object.assign({ clearManualLocation: true }, options || {});
-            locationMethodInput.value = method;
+            const normalizedMethod = method === "current" || method === "manual" ? method : "";
+            locationMethodInput.value = normalizedMethod;
 
-            if (method === "current") {
+            if (normalizedMethod === "current") {
                 currentBtn.classList.add("active");
                 manualBtn.classList.remove("active");
                 manualLocationInput.disabled = true;
                 if (config.clearManualLocation) {
                     manualLocationInput.value = "";
                 }
-            } else {
+            } else if (normalizedMethod === "manual") {
                 manualBtn.classList.add("active");
                 currentBtn.classList.remove("active");
                 manualLocationInput.disabled = false;
+            } else {
+                currentBtn.classList.remove("active");
+                manualBtn.classList.remove("active");
+                manualLocationInput.disabled = true;
+                if (config.clearManualLocation) {
+                    manualLocationInput.value = "";
+                }
             }
         }
 
@@ -2019,7 +2166,7 @@
                 latitude: (state.latitude !== undefined ? state.latitude : latitudeInput.value || "").toString().trim(),
                 longitude: (state.longitude !== undefined ? state.longitude : longitudeInput.value || "").toString().trim(),
                 manual_location: (state.manual_location !== undefined ? state.manual_location : manualLocationInput.value || "").toString().trim(),
-                location_method: (state.location_method !== undefined ? state.location_method : locationMethodInput.value || "current").toString().trim()
+                location_method: (state.location_method !== undefined ? state.location_method : locationMethodInput.value || "").toString().trim()
             };
         }
 
@@ -2097,7 +2244,8 @@
         }
 
         function updateWeatherUI(data) {
-            const cityText = translateLocationTextForCurrentLang(data.city || "--");
+            const resolvedLocationName = data.location_name || data.city || "--";
+            const cityText = translateLocationTextForCurrentLang(resolvedLocationName);
 
             weatherCity.textContent = cityText;
             weatherTemperature.textContent = data.temperature !== null && data.temperature !== undefined
@@ -2111,7 +2259,7 @@
                 : "--";
 
             selectedCityCard.textContent = cityText;
-            weatherCityInput.value = data.city || "";
+            weatherCityInput.value = resolvedLocationName !== "--" ? resolvedLocationName : "";
             weatherTemperatureInput.value = data.temperature !== null && data.temperature !== undefined ? data.temperature : "";
             weatherHumidityInput.value = data.humidity !== null && data.humidity !== undefined ? data.humidity : "";
             rainfallInput.value = data.rainfall !== null && data.rainfall !== undefined ? data.rainfall : "";
@@ -2244,6 +2392,11 @@
         function fetchCurrentLocationAndWeather(options) {
             const config = Object.assign({ silent: false }, options || {});
 
+            if (!window.isSecureContext) {
+                fallbackToManualLocation("locationPermissionSecureStatus");
+                return;
+            }
+
             if (!navigator.geolocation) {
                 setStatus(t("geolocationNotSupported"));
                 return;
@@ -2253,28 +2406,58 @@
                 setStatus(t("fetchingCurrentLocation"));
             }
 
-            navigator.geolocation.getCurrentPosition(
-                function (position) {
-                    const lat = position.coords.latitude;
-                    const lon = position.coords.longitude;
+            function requestBrowserLocation() {
+                navigator.geolocation.getCurrentPosition(
+                    function (position) {
+                        const lat = position.coords.latitude;
+                        const lon = position.coords.longitude;
 
-                    updateMarker(lat, lon);
+                        updateMarker(lat, lon);
 
-                    fetchWeather({
-                        latitude: lat,
-                        longitude: lon,
-                        manual_location: "",
-                        location_method: "current"
-                    }, config);
-                },
-                function () {
-                    setStatus(t("currentLocationDenied"));
-                },
-                {
-                    enableHighAccuracy: true,
-                    timeout: 12000
-                }
-            );
+                        fetchWeather({
+                            latitude: lat,
+                            longitude: lon,
+                            manual_location: "",
+                            location_method: "current"
+                        }, config);
+                    },
+                    function (error) {
+                        if (error && error.code === error.PERMISSION_DENIED) {
+                            fallbackToManualLocation("locationPermissionBlockedStatus");
+                            return;
+                        }
+
+                        if (error && error.code === error.TIMEOUT) {
+                            fallbackToManualLocation("locationPopupTimeoutText");
+                            return;
+                        }
+
+                        fallbackToManualLocation("locationPopupUnavailableText");
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 12000
+                    }
+                );
+            }
+
+            if (navigator.permissions && typeof navigator.permissions.query === "function") {
+                navigator.permissions.query({ name: "geolocation" })
+                    .then(function (permissionStatus) {
+                        if (permissionStatus && permissionStatus.state === "denied") {
+                            fallbackToManualLocation("locationPermissionBlockedStatus");
+                            return;
+                        }
+
+                        requestBrowserLocation();
+                    })
+                    .catch(function () {
+                        requestBrowserLocation();
+                    });
+                return;
+            }
+
+            requestBrowserLocation();
         }
 
         function getSavedFarms() {
@@ -2412,7 +2595,7 @@
                 }
             });
 
-            setMethod(state.location_method || "current", { clearManualLocation: false });
+            setMethod(state.location_method || "", { clearManualLocation: false });
 
             if (manualLocationInput && state.manual_location !== undefined) {
                 manualLocationInput.value = state.manual_location;
@@ -2705,6 +2888,18 @@
         cropForm.addEventListener("submit", function (e) {
             const payload = buildLocationPayload();
 
+            if (!locationMethodInput.value.trim()) {
+                e.preventDefault();
+                setStatus(t("selectLocationMethodFirst"));
+                return;
+            }
+
+            if (locationMethodInput.value === "current" && !latitudeInput.value.trim() && !longitudeInput.value.trim()) {
+                e.preventDefault();
+                setStatus(t("currentLocationDenied"));
+                return;
+            }
+
             if (!hasResolvableLocation()) {
                 e.preventDefault();
                 setStatus(t("selectLocationFirst"));
@@ -2766,12 +2961,10 @@
                 refreshWeatherForCurrentSelection({ silent: true });
             }
         } else {
-            setMethod("current");
+            setMethod("");
             persistDraft();
 
-            if (navigator.onLine) {
-                fetchCurrentLocationAndWeather({ silent: true });
-            } else {
+            if (!navigator.onLine) {
                 setStatus(t("networkOffline"));
             }
         }

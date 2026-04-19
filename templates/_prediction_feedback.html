@@ -5,7 +5,7 @@
   </div>
   <div class="summary-box-clean">
     {% if lang == 'mr' %}
-      तुमचा अभिप्राय जतन केला आहे. यामुळे पुढील शिफारसी अधिक उपयोगी बनवता येतील.
+      तुमचा अभिप्राय जतन केला आहे. यामुळे पुढील शिफारसी अधिक उपयुक्त बनवता येतील.
     {% else %}
       Your feedback was saved. This helps us improve future recommendations without interrupting every prediction.
     {% endif %}
@@ -63,6 +63,68 @@
     padding-top: 8px;
   }
 
+  .feedback-voice-field {
+    position: relative;
+  }
+
+  .feedback-voice-field .form-control {
+    padding-right: 58px;
+  }
+
+  .feedback-voice-field textarea.form-control {
+    min-height: 114px;
+    padding-top: 12px;
+    padding-right: 58px;
+    resize: vertical;
+  }
+
+  .feedback-voice-btn {
+    position: absolute;
+    top: 50%;
+    right: 12px;
+    transform: translateY(-50%);
+    width: 38px;
+    height: 38px;
+    border: 1px solid rgba(47, 123, 87, 0.18);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.96);
+    color: var(--primary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 8px 18px rgba(20, 40, 30, 0.08);
+  }
+
+  .feedback-voice-btn:hover {
+    background: #ffffff;
+  }
+
+  .feedback-voice-btn.is-recording {
+    background: #ffe9e5;
+    color: #b93d2c;
+    border-color: rgba(185, 61, 44, 0.24);
+  }
+
+  .feedback-voice-btn[hidden] {
+    display: none !important;
+  }
+
+  .feedback-voice-status,
+  #feedbackVoiceStatus {
+    display: none !important;
+  }
+
+  .feedback-voice-icon {
+    width: 18px;
+    height: 18px;
+  }
+
+  .feedback-voice-field--textarea .feedback-voice-btn {
+    top: 14px;
+    transform: none;
+  }
+
   @media (max-width: 768px) {
     .feedback-popup-backdrop {
       padding: 14px;
@@ -91,9 +153,7 @@
         </div>
         <p class="mini-note mb-3">
           {% if lang == 'mr' %}
-            
           {% else %}
-            
           {% endif %}
         </p>
 
@@ -124,27 +184,61 @@
             <label for="feedback-chosen-crop">
               {% if lang == 'mr' %}प्रत्यक्षात कोणते पीक निवडले?{% else %}Which crop did you actually choose?{% endif %}
             </label>
-            <input
-              class="form-control"
-              id="feedback-chosen-crop"
-              name="chosen_crop"
-              maxlength="80"
-              placeholder="{% if lang == 'mr' %}उदा. सोयाबीन{% else %}Example: soybean{% endif %}"
-              type="text"
-            >
+            <div class="feedback-voice-field">
+              <input
+                class="form-control"
+                id="feedback-chosen-crop"
+                name="chosen_crop"
+                maxlength="80"
+                placeholder="{% if lang == 'mr' %}उदा. सोयाबीन{% else %}Example: soybean{% endif %}"
+                type="text"
+              >
+              <button
+                class="feedback-voice-btn"
+                data-speech-mode="replace"
+                data-speech-target="feedback-chosen-crop"
+                type="button"
+                aria-label="{% if lang == 'mr' %}मायक्रोफोन वापरा{% else %}Use microphone{% endif %}"
+                title="{% if lang == 'mr' %}मायक्रोफोन वापरा{% else %}Use microphone{% endif %}"
+              >
+                <svg class="feedback-voice-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M12 3a3 3 0 0 1 3 3v5a3 3 0 1 1-6 0V6a3 3 0 0 1 3-3Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+                  <path d="M19 11a7 7 0 0 1-14 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+                  <path d="M12 18v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+                  <path d="M8.5 21h7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+                </svg>
+              </button>
+            </div>
           </div>
 
           <div class="form-group mb-3">
             <label for="feedback-season-result">
               {% if lang == 'mr' %}हंगामानंतर काय निकाल मिळाला?{% else %}What was the result after the season?{% endif %}
             </label>
-            <textarea
-              class="form-control"
-              id="feedback-season-result"
-              name="season_result"
-              maxlength="240"
-              placeholder="{% if lang == 'mr' %}उत्पादन, खर्च, अडचणी किंवा निरीक्षण लिहा{% else %}Share yield, cost, issues, or any quick field note{% endif %}"
-            ></textarea>
+            <div class="feedback-voice-field feedback-voice-field--textarea">
+              <textarea
+                class="form-control"
+                id="feedback-season-result"
+                name="season_result"
+                maxlength="240"
+                placeholder="{% if lang == 'mr' %}उत्पादन, खर्च, अडचणी किंवा निरीक्षण लिहा{% else %}Share yield, cost, issues, or any quick field note{% endif %}"
+              ></textarea>
+              <button
+                class="feedback-voice-btn"
+                data-speech-mode="append"
+                data-speech-target="feedback-season-result"
+                type="button"
+                aria-label="{% if lang == 'mr' %}मायक्रोफोन वापरा{% else %}Use microphone{% endif %}"
+                title="{% if lang == 'mr' %}मायक्रोफोन वापरा{% else %}Use microphone{% endif %}"
+              >
+                <svg class="feedback-voice-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M12 3a3 3 0 0 1 3 3v5a3 3 0 1 1-6 0V6a3 3 0 0 1 3-3Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+                  <path d="M19 11a7 7 0 0 1-14 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+                  <path d="M12 18v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+                  <path d="M8.5 21h7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+                </svg>
+              </button>
+            </div>
           </div>
 
           <div class="result-actions justify-content-start">
@@ -169,6 +263,100 @@
 
     popupClose.addEventListener("click", function () {
       popupBackdrop.style.display = "none";
+    });
+  })();
+
+  (function () {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const voiceButtons = Array.from(document.querySelectorAll(".feedback-voice-btn"));
+    const speechLang = {{ ('mr-IN' if lang == 'mr' else 'en-IN') | tojson }};
+
+    let activeRecognition = null;
+    let activeButton = null;
+
+    function clearRecordingState() {
+      if (activeButton) {
+        activeButton.classList.remove("is-recording");
+      }
+      activeButton = null;
+      activeRecognition = null;
+    }
+
+    if (!voiceButtons.length) {
+      return;
+    }
+
+    if (!SpeechRecognition) {
+      voiceButtons.forEach(function (button) {
+        button.hidden = true;
+      });
+      return;
+    }
+
+    voiceButtons.forEach(function (button) {
+      button.addEventListener("click", function () {
+        const targetId = button.getAttribute("data-speech-target");
+        const mode = button.getAttribute("data-speech-mode") || "replace";
+        const target = targetId ? document.getElementById(targetId) : null;
+
+        if (!target) {
+          return;
+        }
+
+        if (activeButton === button && activeRecognition) {
+          activeRecognition.stop();
+          return;
+        }
+
+        if (activeRecognition) {
+          activeRecognition.stop();
+        }
+
+        const recognition = new SpeechRecognition();
+        const originalValue = target.value || "";
+        recognition.lang = speechLang;
+        recognition.interimResults = true;
+        recognition.continuous = false;
+        recognition.maxAlternatives = 1;
+
+        activeRecognition = recognition;
+        activeButton = button;
+        button.classList.add("is-recording");
+
+        recognition.onresult = function (event) {
+          const transcript = Array.from(event.results)
+            .map(function (result) {
+              return result[0] ? result[0].transcript : "";
+            })
+            .join(" ")
+            .trim();
+
+          if (!transcript) {
+            return;
+          }
+
+          if (mode === "append") {
+            const spacer = originalValue && !/\s$/.test(originalValue) ? " " : "";
+            target.value = (originalValue + spacer + transcript).trim();
+            return;
+          }
+
+          target.value = transcript;
+        };
+
+        recognition.onerror = function (event) {
+          clearRecordingState();
+          if (event && event.error === "aborted") {
+            return;
+          }
+        };
+
+        recognition.onend = function () {
+          clearRecordingState();
+        };
+
+        recognition.start();
+      });
     });
   })();
 </script>

@@ -9,6 +9,25 @@ from utils.crop_features import FEATURE_COLUMNS
 
 
 class CropArtifactLoadingTests(unittest.TestCase):
+    def test_saved_artifacts_can_generate_dual_xai_bundle(self):
+        from xai_explainer import explain_crop_prediction_bundle
+
+        sample_df = pd.DataFrame(
+            [[86, 59, 42, 27.59, 77.34, 5.70, 205.81, "Kharif", "canal", "high"]],
+            columns=FEATURE_COLUMNS
+        )
+
+        bundle = explain_crop_prediction_bundle(sample_df)
+
+        self.assertEqual(bundle["prediction"], bundle["top3_predictions"][0]["crop"])
+        self.assertIn("shap_table", bundle)
+        self.assertIn("lime_table", bundle)
+        self.assertIn("consensus_summary", bundle)
+        self.assertFalse(bundle["shap_table"].empty)
+        self.assertFalse(bundle["lime_table"].empty)
+        self.assertGreater(len(bundle["shap_lines"]), 0)
+        self.assertGreater(len(bundle["lime_lines"]), 0)
+
     def test_saved_artifacts_can_generate_prediction(self):
         from xai_explainer import explain_crop_prediction
 
@@ -184,68 +203,103 @@ class CropPredictRouteTests(unittest.TestCase):
             self.assertEqual(response.status_code, 302)
             self.assertIn("/crop-recommend", response.headers["Location"])
 
-    def test_crop_predict_passes_model_info_to_result_template(self):
-        captured = {}
-        base_df = pd.DataFrame([
-            {"Feature": "Rainfall", "Impact Value": 0.42, "Effect": "Positive (Helps crop)"}
-        ])
-
-        xai_runtime = {
-            "explain_crop_prediction": lambda *_args, **_kwargs: (
-                base_df.copy(), base_df.copy(),
-                ["Rainfall positively influenced the recommendation of rice."],
-                "rice",
-                [{"crop": "rice", "confidence": 100.0, "actual_confidence": 100.0}]
-            ),
-            "explain_specific_crop_prediction": lambda *_args, **_kwargs: (
-                base_df.copy(), base_df.copy(),
-                ["Rainfall positively influenced the recommendation of rice."],
-                "rice",
-                [{"crop": "rice", "confidence": 100.0, "actual_confidence": 100.0}]
-            ),
-        }
-
-        def fake_render(template, **context):
-            captured.update(context)
-            return context["prediction"]
-
-        with patch.object(self.app_module, "get_lang", return_value="en"), \
-             patch.object(self.app_module, "resolve_location_and_weather", return_value={
-                 "city": "Pune",
-                 "temperature": 27.5,
-                 "humidity": 78.0,
-                 "rainfall": 210.0,
-                 "latitude": 18.52,
-                 "longitude": 73.85
-             }), \
-             patch.object(self.app_module, "get_crop_xai_runtime", return_value=xai_runtime), \
-             patch.object(self.app_module, "rerank_top3_predictions_by_season", return_value=("Kharif", [{"crop": "rice", "confidence": 100.0, "actual_confidence": 100.0}])), \
-             patch.object(self.app_module, "get_msamb_live_price", return_value=None), \
-             patch.object(self.app_module, "estimate_yield_and_profit", return_value=(12.5, 10000.0)), \
-             patch.object(self.app_module, "generate_overall_summary", return_value="summary"), \
-             patch.object(self.app_module, "get_crop_sowing_guidance", return_value={"best_sowing_window": "Now"}), \
-             patch.object(self.app_module, "localize_crop_output", return_value=("rice", [{"crop": "rice", "confidence": 100.0, "actual_confidence": 100.0}], base_df.copy(), ["line"])), \
-             patch.object(self.app_module, "render_template", side_effect=fake_render):
-
+    def test_crop_recommend_page_has_location_method_selector_without_custom_popup(self):
+        with patch.object(self.app_module, "start_crop_runtime_warmup") as warmup_mock:
             client = self.flask_app.test_client()
-            response = client.post("/crop-predict", data={
-                "nitrogen": "80",
-                "phosphorous": "40",
-                "pottasium": "40",
-                "ph": "6.5",
-                "land_area": "2",
-                "land_unit": "acre",
-                "water_source": "canal",
-                "water_availability": "high",
-                "latitude": "18.52",
-                "longitude": "73.85",
+            response = client.get("/crop-recommend?lang=en")
+            body = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('id="location_method" value=""', body)
+        self.assertIn('class="toggle-btn" id="currentLocationBtn"', body)
+        self.assertNotIn('id="locationPermissionPopup"', body)
+        self.assertNotIn('id="locationPermissionAllowBtn"', body)
+        warmup_mock.assert_called_once()
+
+    def test_get_weather_data_returns_location_name_and_city(self):
+        with patch.object(self.app_module, "get_lang", return_value="mr"), \
+             patch.object(self.app_module, "resolve_location_and_weather", return_value={
+                 "city": "Kagal",
+                 "location_name": "Kagal",
+                 "temperature": 26.4,
+                 "humidity": 74.0,
+                 "rainfall": 12.5,
+                 "latitude": 16.593256,
+                 "longitude": 74.329119,
+             }):
+            client = self.flask_app.test_client()
+            response = client.post("/get-weather-data", json={
+                "latitude": "16.593256",
+                "longitude": "74.329119",
                 "location_method": "current"
             })
 
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(captured["model_info"]["version"], "v2.1")
-            self.assertEqual(captured["model_info"]["last_trained"], "2026-03-28")
-            self.assertEqual(captured["model_info"]["region"], "Maharashtra-focused")
+            payload = response.get_json()
+            self.assertTrue(payload["success"])
+            self.assertEqual(payload["city"], "Kagal")
+            self.assertEqual(payload["location_name"], "Kagal")
+
+
+class FarmChatRouteTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        try:
+            cls.app_module = importlib.import_module("app")
+        except ModuleNotFoundError as exc:
+            raise unittest.SkipTest("App dependencies are not installed: {0}".format(exc))
+
+        cls.flask_app = cls.app_module.app
+        cls.flask_app.testing = True
+
+    def test_farm_chat_uses_last_crop_result(self):
+        client = self.flask_app.test_client()
+
+        with client.session_transaction() as session_data:
+            session_data["last_crop_result"] = {
+                "prediction_raw": "groundnut",
+                "current_season": "Summer",
+                "weather_city": "Pune",
+                "estimated_profit": "₹12000",
+            }
+
+        response = client.post("/farm-chat?lang=en", json={
+            "message": "What was my last crop recommendation?",
+            "client_context": {
+                "savedFarms": [
+                    {
+                        "name": "West Plot",
+                        "manual_location": "Kagal",
+                        "latitude": "16.59",
+                        "longitude": "74.32",
+                    }
+                ],
+                "recentPredictions": [],
+                "latestWeather": {},
+            }
+        })
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["success"])
+        self.assertIn("groundnut", payload["reply"].lower())
+        self.assertIn("pune", payload["reply"].lower())
+
+    def test_farm_chat_reset_clears_session_history(self):
+        client = self.flask_app.test_client()
+
+        with client.session_transaction() as session_data:
+            session_data["farm_chat_history"] = [{"role": "user", "content": "hello"}]
+
+        response = client.post("/farm-chat?lang=en", json={"action": "reset"})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["success"])
+        self.assertIn("reset", payload["reply"].lower())
+
+        with client.session_transaction() as session_data:
+            self.assertNotIn("farm_chat_history", session_data)
 
 
 class FertilizerRouteValidationTests(unittest.TestCase):
@@ -294,6 +348,27 @@ class FertilizerRouteValidationTests(unittest.TestCase):
             self.assertEqual(response.status_code, 400)
             self.assertIn(b"Crop is required.", response.data)
             self.assertEqual(captured["retry_url"], "/fertilizer?lang=en")
+
+    def test_fertilizer_predict_rejects_missing_crop_in_marathi(self):
+        captured = {}
+
+        def fake_render(template, **context):
+            captured.update(context)
+            return context.get("error_message", template)
+
+        with patch.object(self.app_module, "get_lang", return_value="mr"), \
+             patch.object(self.app_module, "render_template", side_effect=fake_render):
+            client = self.flask_app.test_client()
+            response = client.post("/fertilizer-predict", data={
+                "nitrogen": "90",
+                "phosphorous": "42",
+                "pottasium": "58",
+                "cropname": ""
+            })
+
+            self.assertEqual(response.status_code, 400)
+            self.assertIn("पीक आवश्यक आहे.", response.get_data(as_text=True))
+            self.assertEqual(captured["retry_url"], "/fertilizer?lang=mr")
 
     def test_fertilizer_predict_rejects_out_of_range_nitrogen(self):
         with patch.object(self.app_module, "get_lang", return_value="en"), \
@@ -386,11 +461,6 @@ class FertilizerRouteValidationTests(unittest.TestCase):
         self.assertIn("Flowering Stage Dose", body)
         self.assertIn("Quantity Per Acre", body)
         self.assertIn("Organic Alternative", body)
-        self.assertIn("Model version", body)
-        self.assertIn("v2.1", body)
-        self.assertIn("Last trained", body)
-        self.assertIn("2026-03-28", body)
-        self.assertIn("Maharashtra-focused", body)
         self.assertIn("Maize", body)
 
     def test_fertilizer_predict_accepts_every_available_crop(self):
@@ -507,6 +577,20 @@ class FertilizerRouteValidationTests(unittest.TestCase):
         finally:
             if os.path.exists(feedback_file):
                 os.remove(feedback_file)
+
+    def test_home_page_shows_subtle_model_info_in_footer(self):
+        client = self.flask_app.test_client()
+        response = client.get("/?lang=en")
+        body = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Model version v2.1", body)
+        self.assertIn("Last trained 2026-03-28", body)
+        self.assertIn("Maharashtra-focused", body)
+        self.assertIn("harvestifyInitialLocationPromptV1", body)
+        self.assertIn("shouldAutoPromptOnPage", body)
+        self.assertIn('navigator.permissions.query({ name: "geolocation" })', body)
+        self.assertIn("navigator.geolocation.getCurrentPosition", body)
 
 
 if __name__ == "__main__":

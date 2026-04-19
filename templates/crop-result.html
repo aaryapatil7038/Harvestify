@@ -268,6 +268,69 @@
       display: none !important;
     }
   }
+
+  .pdf-export-active {
+    background: #f5efe4 !important;
+  }
+
+  .pdf-export-active .bg-orb,
+  .pdf-export-active .bg-grid,
+  .pdf-export-active .result-download-wrap,
+  .pdf-export-active .page-hero::after {
+    display: none !important;
+    content: none !important;
+  }
+
+  .pdf-export-active,
+  .pdf-export-active .page-hero,
+  .pdf-export-active .section-card,
+  .pdf-export-active .summary-box-clean,
+  .pdf-export-active .top3-item,
+  .pdf-export-active .xai-line,
+  .pdf-export-active .info-box-clean,
+  .pdf-export-active .clean-table {
+    background: #fffdf9 !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    filter: none !important;
+    backdrop-filter: none !important;
+  }
+
+  .pdf-export-active .page-hero {
+    background: #fbf5eb !important;
+  }
+
+  .pdf-export-active .clean-table th {
+    background: #f7f1e7 !important;
+  }
+
+  .pdf-export-active .confidence-progress,
+  .pdf-export-active .confidence-progress::-webkit-progress-bar {
+    background: #e4ddd1 !important;
+  }
+
+  .pdf-export-active .result-download-btn,
+  .pdf-export-active * {
+    text-shadow: none !important;
+  }
+
+  .pdf-export-stage {
+    position: fixed !important;
+    left: -100000px !important;
+    top: 0 !important;
+    width: 0 !important;
+    height: 0 !important;
+    overflow: hidden !important;
+    pointer-events: none !important;
+    opacity: 0 !important;
+    z-index: -1 !important;
+  }
+
+  .pdf-export-stage .page-wrap {
+    width: 1120px !important;
+    padding: 24px !important;
+    background: #f5efe4 !important;
+  }
 </style>
 
 <div class="page-wrap">
@@ -424,8 +487,6 @@
     </div>
     {% endif %}
 
-    {% include '_model_info.html' %}
-
     <!-- OVERALL SUMMARY -->
     {% if overall_summary %}
     <div class="section-card">
@@ -520,21 +581,32 @@
     </div>
     {% endif %}
 
-    <!-- XAI EXPLANATION LINES -->
+    <!-- SHAP EXPLANATION -->
     {% if explanations %}
     <div class="section-card">
-      <div class="section-title">{{ ui.xai_title }}</div>
+      <div class="section-title">
+        {% if lang == 'mr' %}
+          SHAP आधारित कारणे
+        {% else %}
+          SHAP Explanation
+        {% endif %}
+      </div>
 
       {% for line in explanations %}
-      <div class="xai-line">✔ {{ line }}</div>
+      <div class="xai-line">&#10004; {{ line }}</div>
       {% endfor %}
     </div>
     {% endif %}
 
-    <!-- FEATURE IMPACT TABLE -->
     {% if explanation is not none %}
     <div class="section-card">
-      <div class="section-title">{{ ui.impact_title }} {{ prediction }}</div>
+      <div class="section-title">
+        {% if lang == 'mr' %}
+          SHAP {{ ui.impact_title }} {{ prediction }}
+        {% else %}
+          SHAP Feature Impact for {{ prediction }}
+        {% endif %}
+      </div>
 
       <div class="impact-table-wrap">
         <table class="clean-table">
@@ -545,6 +617,67 @@
           </tr>
 
           {% for row in explanation.itertuples() %}
+          <tr>
+            <td>{{ row.Feature }}</td>
+            <td>{{ row[2] }}</td>
+            <td>{{ row.Effect }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if xai_consensus_summary %}
+    <div class="section-card">
+      <div class="section-title">
+        {% if lang == 'mr' %}
+          SHAP + LIME एकत्रित निष्कर्ष
+        {% else %}
+          SHAP + LIME Combined Takeaway
+        {% endif %}
+      </div>
+      <div class="summary-box-clean">
+        {{ xai_consensus_summary }}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if lime_explanations %}
+    <div class="section-card">
+      <div class="section-title">
+        {% if lang == 'mr' %}
+          LIME स्थानिक कारणे
+        {% else %}
+          LIME Local Explanation
+        {% endif %}
+      </div>
+
+      {% for line in lime_explanations %}
+      <div class="xai-line">&#10004; {{ line }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if lime_explanation is not none and not lime_explanation.empty %}
+    <div class="section-card">
+      <div class="section-title">
+        {% if lang == 'mr' %}
+          LIME स्थानिक परिणाम {{ prediction }}
+        {% else %}
+          LIME Local Feature Weights for {{ prediction }}
+        {% endif %}
+      </div>
+
+      <div class="impact-table-wrap">
+        <table class="clean-table">
+          <tr>
+            <th>{{ ui.feature }}</th>
+            <th>{% if lang == 'mr' %}स्थानिक वजन{% else %}Local Weight{% endif %}</th>
+            <th>{{ ui.effect }}</th>
+          </tr>
+
+          {% for row in lime_explanation.itertuples() %}
           <tr>
             <td>{{ row.Feature }}</td>
             <td>{{ row[2] }}</td>
@@ -593,6 +726,72 @@
     const downloadButton = document.getElementById("downloadResultBtn");
     const pageWrap = document.querySelector(".page-wrap");
 
+    function buildExportClone() {
+      const stage = document.createElement("div");
+      stage.className = "pdf-export-stage";
+
+      const exportRoot = pageWrap.cloneNode(true);
+      exportRoot.classList.add("pdf-export-active");
+
+      stage.appendChild(exportRoot);
+      document.body.appendChild(stage);
+
+      const ignoredNodes = exportRoot.querySelectorAll("[data-html2canvas-ignore='true']");
+      ignoredNodes.forEach(function (node) {
+        node.remove();
+      });
+
+      return {
+        stage: stage,
+        exportRoot: exportRoot,
+      };
+    }
+
+    function destroyExportClone(stage) {
+      if (stage && stage.parentNode) {
+        stage.parentNode.removeChild(stage);
+      }
+    }
+
+    function renderPdfPages(sourceCanvas, pdf, contentWidth, contentHeight) {
+      const pagePixelHeight = Math.max(1, Math.floor((sourceCanvas.width * contentHeight) / contentWidth));
+      let sourceOffsetY = 0;
+      let isFirstPage = true;
+
+      while (sourceOffsetY < sourceCanvas.height) {
+        const sliceHeight = Math.min(pagePixelHeight, sourceCanvas.height - sourceOffsetY);
+        const pageCanvas = document.createElement("canvas");
+        pageCanvas.width = sourceCanvas.width;
+        pageCanvas.height = sliceHeight;
+
+        const pageContext = pageCanvas.getContext("2d", { alpha: false });
+        pageContext.fillStyle = "#fffdf9";
+        pageContext.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+        pageContext.drawImage(
+          sourceCanvas,
+          0,
+          sourceOffsetY,
+          sourceCanvas.width,
+          sliceHeight,
+          0,
+          0,
+          pageCanvas.width,
+          sliceHeight
+        );
+
+        if (!isFirstPage) {
+          pdf.addPage();
+        }
+
+        const renderedHeight = (sliceHeight * contentWidth) / sourceCanvas.width;
+        const pageImageData = pageCanvas.toDataURL("image/png");
+        pdf.addImage(pageImageData, "PNG", 8, 8, contentWidth, renderedHeight, "", "FAST");
+
+        sourceOffsetY += sliceHeight;
+        isFirstPage = false;
+      }
+    }
+
     if (downloadButton) {
       downloadButton.addEventListener("click", async function () {
         if (!pageWrap || !window.html2canvas || !window.jspdf || !window.jspdf.jsPDF) {
@@ -605,39 +804,36 @@
         downloadButton.style.opacity = "0.7";
         downloadButton.setAttribute("aria-label", "{% if lang == 'mr' %}PDF तयार होत आहे{% else %}Preparing PDF{% endif %}");
 
+        let exportStage = null;
+
         try {
-          const canvas = await window.html2canvas(pageWrap, {
+          const exportNodes = buildExportClone();
+          exportStage = exportNodes.stage;
+
+          const canvas = await window.html2canvas(exportNodes.exportRoot, {
             scale: 2,
             useCORS: true,
-            backgroundColor: "#f5efe4",
-            logging: false
+            backgroundColor: "#fffdf9",
+            logging: false,
+            removeContainer: true,
+            scrollX: 0,
+            scrollY: 0,
+            windowWidth: exportNodes.exportRoot.scrollWidth,
+            windowHeight: exportNodes.exportRoot.scrollHeight
           });
 
           const { jsPDF } = window.jspdf;
           const pdf = new jsPDF("p", "mm", "a4");
-          const pageWidth = pdf.internal.pageSize.getWidth();
-          const pageHeight = pdf.internal.pageSize.getHeight();
-          const imageWidth = pageWidth;
-          const imageHeight = (canvas.height * imageWidth) / canvas.width;
-          const imageData = canvas.toDataURL("image/png");
+          const contentWidth = pdf.internal.pageSize.getWidth() - 16;
+          const contentHeight = pdf.internal.pageSize.getHeight() - 16;
 
-          let remainingHeight = imageHeight;
-          let yOffset = 0;
-
-          pdf.addImage(imageData, "PNG", 0, yOffset, imageWidth, imageHeight, "", "FAST");
-          remainingHeight -= pageHeight;
-
-          while (remainingHeight > 0) {
-            yOffset -= pageHeight;
-            pdf.addPage();
-            pdf.addImage(imageData, "PNG", 0, yOffset, imageWidth, imageHeight, "", "FAST");
-            remainingHeight -= pageHeight;
-          }
+          renderPdfPages(canvas, pdf, contentWidth, contentHeight);
 
           pdf.save("crop-prediction-report.pdf");
         } catch (error) {
           window.print();
         } finally {
+          destroyExportClone(exportStage);
           downloadButton.disabled = false;
           downloadButton.style.opacity = "";
           downloadButton.setAttribute("aria-label", originalLabel);

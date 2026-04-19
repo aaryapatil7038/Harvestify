@@ -1,4 +1,5 @@
 {% extends 'layout.html' %}
+
 {% block body %}
 
 <div class="page-wrap">
@@ -6,7 +7,7 @@
   <section class="hero-shell">
     <div class="hero-panel hero-copy">
       <span class="eyebrow">{% if lang == 'mr' %}शेती निर्णय, अधिक सोपे{% else %}Field Decisions, Simplified{% endif %}</span>
-      <h1>{{ ui.home_title }}</h1>
+      <h1 class="home-hero-title">{{ ui.home_title }}</h1>
       <p class="hero-lead mt-3">{{ ui.home_subtitle }}</p>
 
       <div class="hero-points mt-4">
@@ -102,5 +103,6 @@
   </section>
 
 </div>
+
 
 {% endblock %}
