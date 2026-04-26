@@ -576,6 +576,44 @@
         visibility: visible;
     }
 
+    .mobile-drawer-toggle {
+        display: none;
+        position: fixed;
+        left: 16px;
+        bottom: max(18px, env(safe-area-inset-bottom, 0px) + 12px);
+        z-index: 620;
+        border: none;
+        border-radius: 999px;
+        background: linear-gradient(135deg, var(--green), var(--green-dark));
+        color: #fff;
+        box-shadow: 0 18px 34px rgba(47,123,87,0.24);
+        padding: 14px 18px;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        cursor: pointer;
+        transition: transform 0.24s ease, opacity 0.24s ease, box-shadow 0.24s ease;
+    }
+
+    .mobile-drawer-toggle:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 22px 38px rgba(47,123,87,0.28);
+    }
+
+    .mobile-drawer-toggle[aria-expanded="true"] {
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(10px);
+    }
+
+    .mobile-drawer-toggle .drawer-label {
+        display: inline;
+        font-size: 0.95rem;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        white-space: nowrap;
+    }
+
     .side-drawer {
         position: fixed;
         top: calc(var(--drawer-top-offset) + var(--drawer-gap));
@@ -1019,20 +1057,45 @@
             height: 320px;
         }
 
+        .mobile-drawer-toggle {
+            display: inline-flex;
+        }
+
         .side-drawer {
-            width: 76px;
-            max-width: calc(100vw - 6px);
-            left: 0;
+            width: min(360px, calc(100vw - 24px));
+            max-width: calc(100vw - 24px);
+            left: 12px;
             border-top-left-radius: 24px;
             border-top-right-radius: 24px;
+            border-bottom-right-radius: 24px;
+            transform: translateX(calc(-100% - 24px));
+            transition: transform 0.28s ease, box-shadow 0.28s ease;
             flex-direction: row;
             flex-wrap: nowrap;
             align-items: stretch;
         }
 
         .side-drawer.open {
-            width: calc(100vw - 6px);
-            max-width: calc(100vw - 6px);
+            width: min(360px, calc(100vw - 24px));
+            max-width: calc(100vw - 24px);
+            transform: translateX(0);
+            box-shadow: 22px 0 50px rgba(15, 23, 42, 0.18);
+        }
+
+        .sidebar-panel {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateX(0);
+        }
+
+        .side-drawer:not(.open) .sidebar-panel {
+            opacity: 0;
+            pointer-events: none;
+            transform: translateX(-8px);
+        }
+
+        .side-drawer:not(.open) .sidebar-tooltip {
+            display: none;
         }
     }
 
@@ -1120,6 +1183,22 @@
         .side-drawer {
             top: var(--drawer-top-offset);
             height: calc(100vh - var(--drawer-top-offset) - 4px);
+            width: min(330px, calc(100vw - 16px));
+            max-width: calc(100vw - 16px);
+            left: 8px;
+            transform: translateX(calc(-100% - 18px));
+        }
+
+        .side-drawer.open {
+            width: min(330px, calc(100vw - 16px));
+            max-width: calc(100vw - 16px);
+        }
+
+        .mobile-drawer-toggle {
+            left: 12px;
+            right: 12px;
+            bottom: max(14px, env(safe-area-inset-bottom, 0px) + 10px);
+            justify-content: center;
         }
     }
 </style>
@@ -1369,7 +1448,7 @@
 
     <div class="drawer-overlay" id="drawerOverlay"></div>
 
-    <aside class="side-drawer" id="sideDrawer">
+    <aside class="side-drawer" id="sideDrawer" aria-hidden="true">
         <div class="sidebar-rail">
             <div class="sidebar-icon-stack">
                 <button type="button" class="drawer-tab active" data-pane="historyPane" data-title="{% if lang == 'mr' %}इतिहास{% else %}History{% endif %}" aria-label="{% if lang == 'mr' %}इतिहास{% else %}History{% endif %}">
@@ -1408,7 +1487,7 @@
             </div>
         </div>
 
-        <div class="sidebar-panel">
+        <div class="sidebar-panel" aria-live="polite">
             <button class="drawer-close" id="drawerClose" type="button" aria-label="{% if lang == 'mr' %}साइडबार बंद करा{% else %}Close sidebar{% endif %}">
                 <svg class="drawer-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M15 6 9 12l6 6"></path>
@@ -1616,6 +1695,21 @@
         </div>
         </div>
     </aside>
+    <button
+        type="button"
+        class="mobile-drawer-toggle"
+        id="drawerToggle"
+        aria-controls="sideDrawer"
+        aria-expanded="false"
+        aria-label="{% if lang == 'mr' %}साइड टूल्स उघडा{% else %}Open side tools{% endif %}"
+    >
+        <svg class="drawer-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4 6h16"></path>
+            <path d="M4 12h16"></path>
+            <path d="M4 18h10"></path>
+        </svg>
+        <span class="drawer-label">{% if lang == 'mr' %}टूल्स{% else %}Tools{% endif %}</span>
+    </button>
 </div>
 
 <script
@@ -1766,6 +1860,19 @@
             } catch (error) {
                 return;
             }
+        }
+
+        function isFiniteMetricValue(value) {
+            if (value === null || value === undefined || value === "") {
+                return false;
+            }
+
+            const numericValue = Number(value);
+            return Number.isFinite(numericValue);
+        }
+
+        function formatMetricValue(value, suffix) {
+            return isFiniteMetricValue(value) ? value + suffix : "N/A";
         }
 
         function escapeHtml(value) {
@@ -1967,8 +2074,21 @@
             return window.innerWidth <= 900;
         }
 
+        function syncDrawerA11yState() {
+            if (!sideDrawer) {
+                return;
+            }
+
+            if (isMobileSidebar()) {
+                sideDrawer.setAttribute("aria-hidden", sideDrawer.classList.contains("open") ? "false" : "true");
+            } else {
+                sideDrawer.setAttribute("aria-hidden", "false");
+            }
+        }
+
         function openDrawer() {
             sideDrawer.classList.add("open");
+            syncDrawerA11yState();
             if (drawerOverlay && isMobileSidebar()) {
                 drawerOverlay.classList.add("show");
             }
@@ -1979,6 +2099,7 @@
 
         function closeDrawer() {
             sideDrawer.classList.remove("open");
+            syncDrawerA11yState();
             if (drawerOverlay) {
                 drawerOverlay.classList.remove("show");
             }
@@ -2015,9 +2136,16 @@
         }
         if (drawerClose) drawerClose.addEventListener("click", closeDrawer);
         if (drawerOverlay) drawerOverlay.addEventListener("click", closeDrawer);
+        document.addEventListener("keydown", function (event) {
+            if (event.key === "Escape" && sideDrawer.classList.contains("open")) {
+                closeDrawer();
+            }
+        });
         syncDrawerOffset();
+        syncDrawerA11yState();
         window.addEventListener("resize", function () {
             syncDrawerOffset();
+            syncDrawerA11yState();
             if (!isMobileSidebar() && drawerOverlay) {
                 drawerOverlay.classList.remove("show");
             }
@@ -2248,21 +2376,15 @@
             const cityText = translateLocationTextForCurrentLang(resolvedLocationName);
 
             weatherCity.textContent = cityText;
-            weatherTemperature.textContent = data.temperature !== null && data.temperature !== undefined
-                ? data.temperature + " °C"
-                : "--";
-            weatherHumidity.textContent = data.humidity !== null && data.humidity !== undefined
-                ? data.humidity + " %"
-                : "--";
-            weatherRainfall.textContent = data.rainfall !== null && data.rainfall !== undefined
-                ? data.rainfall + " mm"
-                : "--";
+            weatherTemperature.textContent = formatMetricValue(data.temperature, " °C");
+            weatherHumidity.textContent = formatMetricValue(data.humidity, " %");
+            weatherRainfall.textContent = formatMetricValue(data.rainfall, " mm");
 
             selectedCityCard.textContent = cityText;
             weatherCityInput.value = resolvedLocationName !== "--" ? resolvedLocationName : "";
-            weatherTemperatureInput.value = data.temperature !== null && data.temperature !== undefined ? data.temperature : "";
-            weatherHumidityInput.value = data.humidity !== null && data.humidity !== undefined ? data.humidity : "";
-            rainfallInput.value = data.rainfall !== null && data.rainfall !== undefined ? data.rainfall : "";
+            weatherTemperatureInput.value = isFiniteMetricValue(data.temperature) ? data.temperature : "";
+            weatherHumidityInput.value = isFiniteMetricValue(data.humidity) ? data.humidity : "";
+            rainfallInput.value = isFiniteMetricValue(data.rainfall) ? data.rainfall : "";
             persistDraft();
         }
 

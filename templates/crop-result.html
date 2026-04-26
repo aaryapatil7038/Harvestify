@@ -434,17 +434,17 @@
       <div class="weather-grid-clean">
         <div class="info-box-clean">
           <h5>{{ ui.city_location }}</h5>
-          <p>{{ weather_city if weather_city is defined else "--" }}</p>
+          <p>{{ weather_city if weather_city is defined else "N/A" }}</p>
         </div>
 
         <div class="info-box-clean">
           <h5>{{ ui.latitude }}</h5>
-          <p>{{ weather_latitude if weather_latitude is defined else "--" }}</p>
+          <p>{{ weather_latitude if weather_latitude is defined else "N/A" }}</p>
         </div>
 
         <div class="info-box-clean">
           <h5>{{ ui.longitude }}</h5>
-          <p>{{ weather_longitude if weather_longitude is defined else "--" }}</p>
+          <p>{{ weather_longitude if weather_longitude is defined else "N/A" }}</p>
         </div>
 
         <div class="info-box-clean">
@@ -453,7 +453,7 @@
             {% if weather_temperature is defined %}
               {{ weather_temperature }} °C
             {% else %}
-              --
+              N/A
             {% endif %}
           </p>
         </div>
@@ -464,7 +464,7 @@
             {% if weather_humidity is defined %}
               {{ weather_humidity }} %
             {% else %}
-              --
+              N/A
             {% endif %}
           </p>
         </div>
@@ -475,7 +475,7 @@
             {% if weather_rainfall is defined %}
               {{ weather_rainfall }} mm
             {% else %}
-              --
+              N/A
             {% endif %}
           </p>
         </div>
@@ -581,111 +581,37 @@
     </div>
     {% endif %}
 
-    <!-- SHAP EXPLANATION -->
-    {% if explanations %}
+    {% if xai_consensus_summary or (combined_xai_table is not none and not combined_xai_table.empty) %}
     <div class="section-card">
-      <div class="section-title">
-        {% if lang == 'mr' %}
-          SHAP आधारित कारणे
-        {% else %}
-          SHAP Explanation
-        {% endif %}
-      </div>
+      <div class="section-title">{{ ui.combined_xai_title }}</div>
 
-      {% for line in explanations %}
-      <div class="xai-line">&#10004; {{ line }}</div>
-      {% endfor %}
-    </div>
-    {% endif %}
-
-    {% if explanation is not none %}
-    <div class="section-card">
-      <div class="section-title">
-        {% if lang == 'mr' %}
-          SHAP {{ ui.impact_title }} {{ prediction }}
-        {% else %}
-          SHAP Feature Impact for {{ prediction }}
-        {% endif %}
-      </div>
-
-      <div class="impact-table-wrap">
-        <table class="clean-table">
-          <tr>
-            <th>{{ ui.feature }}</th>
-            <th>{{ ui.impact_value }}</th>
-            <th>{{ ui.effect }}</th>
-          </tr>
-
-          {% for row in explanation.itertuples() %}
-          <tr>
-            <td>{{ row.Feature }}</td>
-            <td>{{ row[2] }}</td>
-            <td>{{ row.Effect }}</td>
-          </tr>
-          {% endfor %}
-        </table>
-      </div>
-    </div>
-    {% endif %}
-
-    {% if xai_consensus_summary %}
-    <div class="section-card">
-      <div class="section-title">
-        {% if lang == 'mr' %}
-          SHAP + LIME एकत्रित निष्कर्ष
-        {% else %}
-          SHAP + LIME Combined Takeaway
-        {% endif %}
-      </div>
+      {% if xai_consensus_summary %}
       <div class="summary-box-clean">
         {{ xai_consensus_summary }}
       </div>
-    </div>
-    {% endif %}
+      {% endif %}
 
-    {% if lime_explanations %}
-    <div class="section-card">
-      <div class="section-title">
-        {% if lang == 'mr' %}
-          LIME स्थानिक कारणे
-        {% else %}
-          LIME Local Explanation
-        {% endif %}
-      </div>
-
-      {% for line in lime_explanations %}
-      <div class="xai-line">&#10004; {{ line }}</div>
-      {% endfor %}
-    </div>
-    {% endif %}
-
-    {% if lime_explanation is not none and not lime_explanation.empty %}
-    <div class="section-card">
-      <div class="section-title">
-        {% if lang == 'mr' %}
-          LIME स्थानिक परिणाम {{ prediction }}
-        {% else %}
-          LIME Local Feature Weights for {{ prediction }}
-        {% endif %}
-      </div>
-
-      <div class="impact-table-wrap">
+      {% if combined_xai_table is not none and not combined_xai_table.empty %}
+      <div class="impact-table-wrap {% if xai_consensus_summary %}mt-3{% endif %}">
         <table class="clean-table">
           <tr>
             <th>{{ ui.feature }}</th>
-            <th>{% if lang == 'mr' %}स्थानिक वजन{% else %}Local Weight{% endif %}</th>
-            <th>{{ ui.effect }}</th>
+            <th>{{ ui.shap_impact }}</th>
+            <th>{{ ui.lime_weight }}</th>
+            <th>{{ ui.combined_effect }}</th>
           </tr>
 
-          {% for row in lime_explanation.itertuples() %}
+          {% for row in combined_xai_table.itertuples() %}
           <tr>
             <td>{{ row.Feature }}</td>
-            <td>{{ row[2] }}</td>
+            <td>{{ row[2] if row[2] is not none else "N/A" }}</td>
+            <td>{{ row[3] if row[3] is not none else "N/A" }}</td>
             <td>{{ row.Effect }}</td>
           </tr>
           {% endfor %}
         </table>
       </div>
+      {% endif %}
     </div>
     {% endif %}
 

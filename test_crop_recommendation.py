@@ -1,4 +1,5 @@
 import importlib
+import math
 import os
 import unittest
 from unittest.mock import patch
@@ -47,6 +48,45 @@ class CropArtifactLoadingTests(unittest.TestCase):
         self.assertEqual(len(explanations), len(FEATURE_COLUMNS))
         self.assertEqual(len(top3_predictions), 3)
         self.assertEqual(top3_predictions[0]["crop"], prediction)
+
+    def test_localize_crop_xai_bundle_combines_shap_and_lime_tables(self):
+        app_module = importlib.import_module("app")
+
+        bundle = {
+            "prediction": "rice",
+            "top3_predictions": [{"crop": "rice", "confidence": 81.0}],
+            "shap_table": pd.DataFrame([
+                {"Feature": "Rainfall", "Impact Value": 0.61, "Effect": "Positive (Helps crop)"},
+                {"Feature": "Nitrogen", "Impact Value": 0.14, "Effect": "Positive (Helps crop)"},
+            ]),
+            "lime_table": pd.DataFrame([
+                {"Feature": "Rainfall", "Local Weight": 0.32, "Effect": "Positive (Helps crop)"},
+                {"Feature": "Nitrogen", "Local Weight": -0.08, "Effect": "Negative (Harms crop)"},
+            ]),
+            "shap_lines": [],
+            "lime_lines": [],
+        }
+
+        localized = app_module.localize_crop_xai_bundle(bundle, "en")
+        combined_table = localized["combined_table"]
+
+        self.assertEqual(
+            list(combined_table.columns),
+            ["Feature", "SHAP Impact", "LIME Weight", "Effect"]
+        )
+        self.assertEqual(combined_table.iloc[0]["Feature"], "Rainfall")
+        self.assertEqual(
+            combined_table.iloc[0]["Effect"],
+            app_module.UI_TEXT["en"]["positive"]
+        )
+
+        nitrogen_row = combined_table[combined_table["Feature"] == "Nitrogen"].iloc[0]
+        self.assertEqual(nitrogen_row["SHAP Impact"], 0.14)
+        self.assertEqual(nitrogen_row["LIME Weight"], -0.08)
+        self.assertEqual(
+            nitrogen_row["Effect"],
+            app_module.UI_TEXT["en"]["mixed"]
+        )
 
     def test_saved_artifacts_do_not_collapse_to_single_crop_for_distinct_inputs(self):
         from xai_explainer import explain_crop_prediction
@@ -173,6 +213,83 @@ class CropPredictRouteTests(unittest.TestCase):
             self.assertEqual(response.status_code, 400)
             self.assertIn(b"Land unit is invalid.", response.data)
 
+    def test_crop_predict_replaces_nan_display_values_with_na(self):
+        base_df = pd.DataFrame([
+            {"Feature": "Rainfall", "Impact Value": 0.42, "Effect": "Positive (Helps crop)"}
+        ])
+        top3_predictions = [
+            {"crop": "rice", "confidence": 60.0, "actual_confidence": 60.0},
+            {"crop": "wheat", "confidence": 25.0, "actual_confidence": 25.0},
+            {"crop": "maize", "confidence": 15.0, "actual_confidence": 15.0},
+        ]
+        xai_runtime = {
+            "explain_crop_prediction": lambda *_args, **_kwargs: (
+                base_df.copy(), base_df.copy(),
+                ["Rainfall positively influenced the recommendation of rice."],
+                "rice",
+                top3_predictions
+            ),
+            "explain_specific_crop_prediction": lambda *_args, **_kwargs: (
+                base_df.copy(), base_df.copy(),
+                ["Rainfall positively influenced the recommendation of rice."],
+                "rice",
+                top3_predictions
+            ),
+        }
+        captured = {}
+
+        def fake_render(template, **context):
+            captured.update(context)
+            return "ok"
+
+        with patch.object(self.app_module, "get_lang", return_value="en"), \
+             patch.object(self.app_module, "resolve_location_and_weather", return_value={
+                 "city": None,
+                 "temperature": math.nan,
+                 "humidity": math.nan,
+                 "rainfall": math.nan,
+                 "latitude": math.nan,
+                 "longitude": math.nan
+             }), \
+             patch.object(self.app_module, "get_crop_xai_runtime", return_value=xai_runtime), \
+             patch.object(self.app_module, "rerank_top3_predictions_by_season", return_value=("Rabi", top3_predictions)), \
+             patch.object(self.app_module, "get_msamb_live_price", return_value={"market": "Test Market", "date": "2026-04-26", "modal_price": math.nan}), \
+             patch.object(self.app_module, "estimate_yield_and_profit", return_value=(math.nan, math.nan)), \
+             patch.object(self.app_module, "generate_overall_summary", return_value="summary"), \
+             patch.object(self.app_module, "get_crop_sowing_guidance", return_value={"sowing_window": math.nan}), \
+             patch.object(self.app_module, "localize_crop_output", return_value=("rice", top3_predictions, base_df.copy(), ["line"])), \
+             patch.object(self.app_module, "render_template", side_effect=fake_render):
+
+            client = self.flask_app.test_client()
+            response = client.post("/crop-predict", data={
+                "nitrogen": "80",
+                "phosphorous": "40",
+                "pottasium": "40",
+                "ph": "6.5",
+                "land_area": "2",
+                "land_unit": "acre",
+                "water_source": "canal",
+                "water_availability": "high",
+                "latitude": "18.52",
+                "longitude": "73.85",
+                "location_method": "current"
+            })
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.data, b"ok")
+            self.assertEqual(captured["estimated_yield"], "N/A")
+            self.assertEqual(captured["estimated_profit"], "N/A")
+            self.assertEqual(captured["live_modal_price"], "N/A")
+            self.assertEqual(captured["market_name"], "N/A")
+            self.assertEqual(captured["price_date"], "N/A")
+            self.assertEqual(captured["weather_city"], "N/A")
+            self.assertEqual(captured["weather_temperature"], "N/A")
+            self.assertEqual(captured["weather_humidity"], "N/A")
+            self.assertEqual(captured["weather_rainfall"], "N/A")
+            self.assertEqual(captured["weather_latitude"], "N/A")
+            self.assertEqual(captured["weather_longitude"], "N/A")
+            self.assertEqual(captured["sowing_guidance"]["sowing_window"], "N/A")
+
     def test_crop_predict_rejects_invalid_water_source(self):
         with patch.object(self.app_module, "get_lang", return_value="en"), \
              patch.object(self.app_module, "render_template", side_effect=lambda template, **context: context.get("error_message", template)):
@@ -202,6 +319,58 @@ class CropPredictRouteTests(unittest.TestCase):
 
             self.assertEqual(response.status_code, 302)
             self.assertIn("/crop-recommend", response.headers["Location"])
+
+    def test_crop_result_page_renders_single_combined_xai_section(self):
+        client = self.flask_app.test_client()
+
+        with client.session_transaction() as session_data:
+            session_data["last_crop_result"] = {
+                "prediction_raw": "rice",
+                "top3_predictions": [{"crop": "rice", "confidence": 81.0}],
+                "explanation": [
+                    {"Feature": "Rainfall", "Impact Value": 0.61, "Effect": "Positive (Helps crop)"},
+                    {"Feature": "Nitrogen", "Impact Value": 0.14, "Effect": "Positive (Helps crop)"},
+                ],
+                "explanations": [],
+                "lime_explanation": [
+                    {"Feature": "Rainfall", "Local Weight": 0.32, "Effect": "Positive (Helps crop)"},
+                    {"Feature": "Nitrogen", "Local Weight": -0.08, "Effect": "Negative (Harms crop)"},
+                ],
+                "lime_explanations": [],
+                "land_area": 2,
+                "land_unit": "acre",
+                "estimated_yield": 12.5,
+                "estimated_profit": "₹10000",
+                "yield_profit_summary_en": "Yield summary",
+                "yield_profit_summary_mr": "Yield summary",
+                "live_modal_price": "N/A",
+                "market_name": "-",
+                "price_date": "-",
+                "weather_city": "Pune",
+                "weather_temperature": 27.5,
+                "weather_humidity": 78.0,
+                "weather_rainfall": 210.0,
+                "weather_latitude": 18.52,
+                "weather_longitude": 73.85,
+                "current_season": "Kharif",
+                "prediction_count": 1,
+                "show_feedback_prompt": False,
+                "feedback_submitted": False,
+            }
+
+        with patch.object(self.app_module, "generate_overall_summary", return_value="summary"), \
+             patch.object(self.app_module, "get_crop_sowing_guidance", return_value=None):
+            response = client.get("/crop-result?lang=en")
+
+        self.assertEqual(response.status_code, 200)
+        body = response.get_data(as_text=True)
+        self.assertIn("Combined SHAP + LIME View", body)
+        self.assertIn("SHAP Impact", body)
+        self.assertIn("LIME Weight", body)
+        self.assertNotIn("SHAP Explanation", body)
+        self.assertNotIn("LIME Local Explanation", body)
+        self.assertNotIn("SHAP Feature Impact for", body)
+        self.assertNotIn("LIME Local Feature Weights for", body)
 
     def test_crop_recommend_page_has_location_method_selector_without_custom_popup(self):
         with patch.object(self.app_module, "start_crop_runtime_warmup") as warmup_mock:

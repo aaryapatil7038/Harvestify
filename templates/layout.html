@@ -101,14 +101,14 @@
 					class="farm-chat-widget"
 					id="farmChatWidget"
 					data-endpoint="{{ url_for('farm_chat', lang=lang) }}"
-					data-welcome="{% if lang == 'mr' %}à¤¨à¤®à¤¸à¥à¤•à¤¾à¤°. à¤®à¥€ à¤¤à¥à¤®à¤šà¤¾ à¤®à¥‹à¤«à¤¤ à¤¶à¥‡à¤¤ à¤¸à¤¹à¤¾à¤¯à¥à¤¯à¤• à¤†à¤¹à¥‡. à¤®à¥€ à¤¤à¥à¤®à¤šà¥€ à¤¸à¥‡à¤µà¥à¤¹ à¤•à¥‡à¤²à¥‡à¤²à¥€ à¤¶à¥‡à¤¤à¤‚, à¤…à¤²à¥€à¤•à¤¡à¥€à¤² prediction à¤†à¤£à¤¿ à¤¶à¥‡à¤µà¤Ÿà¤šà¥‡ crop à¤•à¤¿à¤‚à¤µà¤¾ fertilizer result à¤µà¤¾à¤ªà¤°à¥‚à¤¨ à¤®à¤¦à¤¤ à¤•à¤°à¥‚ à¤¶à¤•à¤¤à¥‹.{% else %}Hello. I am your free farm assistant. I can use your saved farms, recent predictions, and latest crop or fertilizer result to help you inside this app.{% endif %}"
-					data-placeholder="{% if lang == 'mr' %}à¤ªà¥€à¤•, à¤–à¤¤, à¤¹à¤µà¤¾à¤®à¤¾à¤¨ à¤•à¤¿à¤‚à¤µà¤¾ à¤¤à¥à¤®à¤šà¥à¤¯à¤¾ à¤‡à¤¤à¤¿à¤¹à¤¾à¤¸à¤¾à¤¬à¤¦à¥à¤¦à¤² à¤µà¤¿à¤šà¤¾à¤°à¤¾{% else %}Ask about crops, fertilizer, weather, or your history{% endif %}"
-					data-send="{% if lang == 'mr' %}à¤ªà¤¾à¤ à¤µà¤¾{% else %}Send{% endif %}"
-					data-title="{% if lang == 'mr' %}à¤¶à¥‡à¤¤ à¤¸à¤¹à¤¾à¤¯à¥à¤¯à¤•{% else %}Farm Assistant{% endif %}"
-					data-subtitle="{% if lang == 'mr' %}à¤®à¥‹à¤«à¤¤ à¤šà¥…à¤Ÿà¤¬à¥‰à¤Ÿ: à¤¶à¥‡à¤¤à¥€ à¤ªà¥à¤°à¤¶à¥à¤¨, à¤…à¥…à¤ª à¤®à¤¦à¤¤ à¤†à¤£à¤¿ à¤¤à¥à¤®à¤šà¤¾ à¤‡à¤¤à¤¿à¤¹à¤¾à¤¸{% else %}Free chatbot for farming questions, app help, and your history{% endif %}"
-					data-toggle="{% if lang == 'mr' %}à¤¶à¥‡à¤¤ à¤¸à¤¹à¤¾à¤¯à¥à¤¯à¤•{% else %}Farm Assistant{% endif %}"
-					data-clear="{% if lang == 'mr' %}à¤°à¥€à¤¸à¥‡à¤Ÿ{% else %}Reset{% endif %}"
-					data-thinking="{% if lang == 'mr' %}à¤µà¤¿à¤šà¤¾à¤° à¤•à¤°à¤¤ à¤†à¤¹à¥‡...{% else %}Thinking...{% endif %}"
+					data-welcome="{% if lang == 'mr' %}नमस्कार. मी तुमचा मोफत शेत सहाय्यक आहे. मी तुमची सेव्ह केलेली शेतं, अलीकडील अंदाज आणि शेवटचा पीक किंवा खत निकाल वापरून या अॅपमध्ये मदत करू शकतो.{% else %}Hello. I am your free farm assistant. I can use your saved farms, recent predictions, and latest crop or fertilizer result to help you inside this app.{% endif %}"
+					data-placeholder="{% if lang == 'mr' %}पीक, खत, हवामान किंवा तुमच्या इतिहासाबद्दल विचारा{% else %}Ask about crops, fertilizer, weather, or your history{% endif %}"
+					data-send="{% if lang == 'mr' %}पाठवा{% else %}Send{% endif %}"
+					data-title="{% if lang == 'mr' %}शेत सहाय्यक{% else %}Farm Assistant{% endif %}"
+					data-subtitle="{% if lang == 'mr' %}मोफत चॅटबॉट: शेती प्रश्न, अॅप मदत आणि तुमचा इतिहास{% else %}Free chatbot for farming questions, app help, and your history{% endif %}"
+					data-toggle="{% if lang == 'mr' %}शेत सहाय्यक{% else %}Farm Assistant{% endif %}"
+					data-clear="{% if lang == 'mr' %}रीसेट{% else %}Reset{% endif %}"
+					data-thinking="{% if lang == 'mr' %}विचार करत आहे...{% else %}Thinking...{% endif %}"
 				></div>
 				</div>
 

@@ -50,6 +50,49 @@ from utils.llm_chat import generate_llm_farm_chat_reply
 from utils.msamb_price import get_msamb_live_price
 from utils.yield_profit import estimate_yield_and_profit
 
+
+def is_invalid_display_value(value):
+    if value is None:
+        return True
+
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        return normalized in {"", "nan", "none", "null", "undefined"}
+
+    try:
+        return bool(pd.isna(value))
+    except TypeError:
+        return False
+
+
+def sanitize_display_value(value, fallback="N/A"):
+    return fallback if is_invalid_display_value(value) else value
+
+
+def sanitize_display_mapping(value, fallback="N/A"):
+    if not isinstance(value, dict):
+        return value
+
+    return {
+        key: sanitize_display_value(item, fallback)
+        for key, item in value.items()
+    }
+
+
+def sanitize_display_dataframe(df, fallback="N/A"):
+    if df is None:
+        return None
+
+    if getattr(df, "empty", False):
+        return df
+
+    sanitized_df = df.copy()
+    for column in sanitized_df.columns:
+        sanitized_df[column] = sanitized_df[column].map(
+            lambda value: sanitize_display_value(value, fallback)
+        )
+    return sanitized_df
+
 # ==============================================================================================
 # ------------------------- LOADING THE TRAINED MODELS ------------------------------------------
 
@@ -410,6 +453,22 @@ UI_TEXT["mr"].update({
     "high": "जास्त"
 })
 
+
+UI_TEXT["en"].update({
+    "combined_xai_title": "Combined SHAP + LIME View",
+    "shap_impact": "SHAP Impact",
+    "lime_weight": "LIME Weight",
+    "combined_effect": "Combined Effect",
+    "mixed": "🟡 Mixed signal"
+})
+
+UI_TEXT["mr"].update({
+    "combined_xai_title": "\u090f\u0915\u0924\u094d\u0930\u093f\u0924 SHAP + LIME \u0926\u0943\u0937\u094d\u091f\u093f\u0915\u094b\u0928",
+    "shap_impact": "SHAP \u092a\u0930\u093f\u0923\u093e\u092e",
+    "lime_weight": "LIME \u0935\u091c\u0928",
+    "combined_effect": "\u090f\u0915\u0924\u094d\u0930\u093f\u0924 \u092a\u0930\u093f\u0923\u093e\u092e",
+    "mixed": "\U0001f7e1 \u092e\u093f\u0936\u094d\u0930 \u0938\u0902\u0915\u0947\u0924"
+})
 
 CROP_TRANSLATIONS = {
     "apple": "सफरचंद",
@@ -1887,6 +1946,64 @@ def generate_dual_xai_summary(prediction, shap_df, lime_df, lang):
     ).format(crop_name) + positive_text + negative_text + disagreement_text
 
 
+def _combine_xai_effect(shap_value, lime_value, lang):
+    signs = []
+    for value in (shap_value, lime_value):
+        if value is None or pd.isna(value):
+            continue
+        if value > 0.0001:
+            signs.append(1)
+        elif value < -0.0001:
+            signs.append(-1)
+        else:
+            signs.append(0)
+
+    meaningful_signs = [sign for sign in signs if sign != 0]
+    if not meaningful_signs:
+        return UI_TEXT[lang]["neutral"]
+    if 1 in meaningful_signs and -1 in meaningful_signs:
+        return UI_TEXT[lang]["mixed"]
+    return UI_TEXT[lang]["positive"] if meaningful_signs[0] > 0 else UI_TEXT[lang]["negative"]
+
+
+def build_combined_xai_table(shap_df, lime_df, lang):
+    empty_df = pd.DataFrame(columns=["Feature", "SHAP Impact", "LIME Weight", "Effect"])
+    if (shap_df is None or shap_df.empty) and (lime_df is None or lime_df.empty):
+        return empty_df
+
+    shap_lookup = {}
+    if shap_df is not None and not shap_df.empty:
+        for _, row in shap_df.iterrows():
+            shap_lookup[row["Feature"]] = row.get("Impact Value")
+
+    lime_lookup = {}
+    if lime_df is not None and not lime_df.empty:
+        for _, row in lime_df.iterrows():
+            lime_lookup[row["Feature"]] = row.get("Local Weight")
+
+    def feature_score(feature_name):
+        shap_value = shap_lookup.get(feature_name)
+        lime_value = lime_lookup.get(feature_name)
+        shap_score = abs(float(shap_value)) if shap_value is not None and not pd.isna(shap_value) else 0.0
+        lime_score = abs(float(lime_value)) if lime_value is not None and not pd.isna(lime_value) else 0.0
+        return max(shap_score, lime_score)
+
+    feature_names = sorted(set(shap_lookup) | set(lime_lookup), key=feature_score, reverse=True)
+
+    rows = []
+    for feature_name in feature_names:
+        shap_value = shap_lookup.get(feature_name)
+        lime_value = lime_lookup.get(feature_name)
+        rows.append({
+            "Feature": feature_name,
+            "SHAP Impact": None if shap_value is None or pd.isna(shap_value) else float(shap_value),
+            "LIME Weight": None if lime_value is None or pd.isna(lime_value) else float(lime_value),
+            "Effect": _combine_xai_effect(shap_value, lime_value, lang),
+        })
+
+    return pd.DataFrame(rows, columns=["Feature", "SHAP Impact", "LIME Weight", "Effect"])
+
+
 def localize_crop_xai_bundle(bundle, lang):
     localized_prediction = translate_crop_name(bundle["prediction"], lang)
 
@@ -1922,6 +2039,7 @@ def localize_crop_xai_bundle(bundle, lang):
         "shap_lines": localized_shap_lines,
         "lime_table": localized_lime_df,
         "lime_lines": localized_lime_lines,
+        "combined_table": build_combined_xai_table(localized_shap_df, localized_lime_df, lang),
         "consensus_summary": generate_dual_xai_summary(
             bundle["prediction"],
             localized_shap_df,
@@ -1946,6 +2064,9 @@ def render_saved_crop_result(saved_result, lang):
         "lime_lines": saved_result.get("lime_explanations", []),
     }
     localized_xai = localize_crop_xai_bundle(bundle, lang)
+    sanitized_sowing_guidance = sanitize_display_mapping(
+        get_crop_sowing_guidance(saved_result["prediction_raw"], lang)
+    )
 
     return render_template(
         "crop-result.html",
@@ -1955,10 +2076,7 @@ def render_saved_crop_result(saved_result, lang):
         prediction_raw=saved_result["prediction_raw"],
         top3_predictions=localized_xai["top3_predictions"],
         top3_predictions_raw=saved_result["top3_predictions"],
-        explanation=localized_xai["shap_table"],
-        explanations=localized_xai["shap_lines"],
-        lime_explanation=localized_xai["lime_table"],
-        lime_explanations=localized_xai["lime_lines"],
+        combined_xai_table=sanitize_display_dataframe(localized_xai["combined_table"]),
         xai_consensus_summary=localized_xai["consensus_summary"],
         shap_method=saved_result.get("shap_method", "fallback"),
         lime_method=saved_result.get("lime_method", "fallback"),
@@ -1971,22 +2089,24 @@ def render_saved_crop_result(saved_result, lang):
         land_area=saved_result["land_area"],
         land_unit_display=("एकर" if saved_result["land_unit"] == "acre" else "हेक्टर") if lang == "mr"
                           else ("Acre" if saved_result["land_unit"] == "acre" else "Hectare"),
-        estimated_yield=saved_result["estimated_yield"],
-        estimated_profit=saved_result["estimated_profit"],
-        yield_profit_summary=saved_result["yield_profit_summary_mr"] if lang == "mr"
-                            else saved_result["yield_profit_summary_en"],
-        live_modal_price=saved_result["live_modal_price"],
-        market_name=saved_result["market_name"],
-        price_date=saved_result["price_date"],
-        weather_city=saved_result.get("weather_city"),
-        weather_temperature=saved_result.get("weather_temperature"),
-        weather_humidity=saved_result.get("weather_humidity"),
-        weather_rainfall=saved_result.get("weather_rainfall"),
-        weather_latitude=saved_result.get("weather_latitude"),
-        weather_longitude=saved_result.get("weather_longitude"),
+        estimated_yield=sanitize_display_value(saved_result["estimated_yield"]),
+        estimated_profit=sanitize_display_value(saved_result["estimated_profit"]),
+        yield_profit_summary=(
+            saved_result["yield_profit_summary_mr"] if lang == "mr"
+            else saved_result["yield_profit_summary_en"]
+        ).replace("nan", "N/A"),
+        live_modal_price=sanitize_display_value(saved_result["live_modal_price"]),
+        market_name=sanitize_display_value(saved_result["market_name"]),
+        price_date=sanitize_display_value(saved_result["price_date"]),
+        weather_city=sanitize_display_value(saved_result.get("weather_city")),
+        weather_temperature=sanitize_display_value(saved_result.get("weather_temperature")),
+        weather_humidity=sanitize_display_value(saved_result.get("weather_humidity")),
+        weather_rainfall=sanitize_display_value(saved_result.get("weather_rainfall")),
+        weather_latitude=sanitize_display_value(saved_result.get("weather_latitude")),
+        weather_longitude=sanitize_display_value(saved_result.get("weather_longitude")),
         current_season=translate_season_name(current_season_raw, lang),
         current_season_raw=current_season_raw,
-        sowing_guidance=get_crop_sowing_guidance(saved_result["prediction_raw"], lang),
+        sowing_guidance=sanitized_sowing_guidance,
         show_feedback_prompt=feedback_prompt_visible,
         feedback_status=request.args.get("feedback") == "submitted",
         feedback_prediction_type="crop",
@@ -2015,7 +2135,7 @@ def render_saved_fertilizer_result(saved_result, lang):
         lang=lang,
         ui=UI_TEXT[lang],
         current_result_url=url_for("fertilizer_result_page", lang=lang),
-        title="à¤–à¤¤ à¤¨à¤¿à¤•à¤¾à¤²" if lang == "mr" else "Fertilizer Result"
+        title="खत निकाल" if lang == "mr" else "Fertilizer Result"
     )
 
 def render_fertilizer_result_page(saved_result, lang):
@@ -2503,10 +2623,7 @@ def crop_prediction():
         localized_xai = localize_crop_xai_bundle(explanation_bundle, lang)
         prediction_display = localized_xai["prediction"]
         top3_display = localized_xai["top3_predictions"]
-        explanation_display = localized_xai["shap_table"]
-        explanations_display = localized_xai["shap_lines"]
-        lime_explanation_display = localized_xai["lime_table"]
-        lime_explanations_display = localized_xai["lime_lines"]
+        combined_xai_table = localized_xai["combined_table"]
         xai_consensus_summary = localized_xai["consensus_summary"]
 
         overall_summary = generate_overall_summary(
@@ -2530,19 +2647,26 @@ def crop_prediction():
         else:
             land_unit_display = "Acre" if land_unit == "acre" else "Hectare"
 
-        if market_data:
+        if market_data and not is_invalid_display_value(live_modal_price_num):
             market_name = market_data.get("market", "")
             price_date = market_data.get("date", "")
             live_price_display = f"₹{live_modal_price_num}"
         else:
-            market_name = "-"
-            price_date = "-"
+            market_name = "N/A"
+            price_date = "N/A"
             live_price_display = "N/A"
+
+        estimated_yield_display = sanitize_display_value(estimated_yield)
+        estimated_profit_display = (
+            f"₹{estimated_profit_num}"
+            if not is_invalid_display_value(estimated_profit_num)
+            else "N/A"
+        )
 
         yield_profit_summary_en = (
             f"Based on the given land area, the estimated yield of {prediction} can be around "
-            f"{estimated_yield} {UI_TEXT['en']['yield_unit']}. Based on the current market price, "
-            f"the estimated profit may be around ₹{estimated_profit_num}. Actual yield and profit may vary "
+            f"{estimated_yield_display} {UI_TEXT['en']['yield_unit']}. Based on the current market price, "
+            f"the estimated profit may be around {estimated_profit_display}. Actual yield and profit may vary "
             f"depending on weather, farming practices, and market conditions."
         )
 
@@ -2554,11 +2678,18 @@ def crop_prediction():
             f"प्रत्यक्ष उत्पादन आणि नफा हवामान, शेती पद्धती आणि बाजारभावानुसार बदलू शकतो."
         )
 
-        estimated_profit_display = f"₹{estimated_profit_num}"
-
+        yield_profit_summary_en = yield_profit_summary_en.replace("nan", "N/A")
+        yield_profit_summary_mr = yield_profit_summary_mr.replace("nan", "N/A")
 
         print("Guidance crop name received:", prediction)
         sowing_guidance = get_crop_sowing_guidance(prediction, lang)
+        sanitized_sowing_guidance = sanitize_display_mapping(sowing_guidance)
+        sanitized_weather_city = sanitize_display_value(city)
+        sanitized_weather_temperature = sanitize_display_value(temperature)
+        sanitized_weather_humidity = sanitize_display_value(humidity)
+        sanitized_weather_rainfall = sanitize_display_value(rainfall)
+        sanitized_weather_latitude = sanitize_display_value(final_latitude)
+        sanitized_weather_longitude = sanitize_display_value(final_longitude)
         feedback_prompt = register_prediction_feedback_prompt()
 
         session["last_crop_result"] = {
@@ -2573,21 +2704,21 @@ def crop_prediction():
             "lime_method": explanation_bundle.get("lime_method", "fallback"),
             "land_area": land_area,
             "land_unit": land_unit,
-            "estimated_yield": estimated_yield,
+            "estimated_yield": estimated_yield_display,
             "estimated_profit": estimated_profit_display,
             "yield_profit_summary_en": yield_profit_summary_en,
             "yield_profit_summary_mr": yield_profit_summary_mr,
             "live_modal_price": live_price_display,
             "market_name": market_name,
             "price_date": price_date,
-            "weather_city": city,
-            "weather_temperature": temperature,
-            "weather_humidity": humidity,
-            "weather_rainfall": rainfall,
-            "weather_latitude": final_latitude,
-            "weather_longitude": final_longitude,
+            "weather_city": sanitized_weather_city,
+            "weather_temperature": sanitized_weather_temperature,
+            "weather_humidity": sanitized_weather_humidity,
+            "weather_rainfall": sanitized_weather_rainfall,
+            "weather_latitude": sanitized_weather_latitude,
+            "weather_longitude": sanitized_weather_longitude,
             "current_season": current_season,
-            "sowing_guidance": sowing_guidance,
+            "sowing_guidance": sanitized_sowing_guidance,
             "prediction_count": feedback_prompt["prediction_count"],
             "show_feedback_prompt": feedback_prompt["show_feedback_prompt"],
             "feedback_submitted": False
@@ -2601,31 +2732,28 @@ def crop_prediction():
             prediction_raw=prediction,
             top3_predictions=top3_display,
             top3_predictions_raw=top3_predictions,
-            explanation=explanation_display,
-            explanations=explanations_display,
-            lime_explanation=lime_explanation_display,
-            lime_explanations=lime_explanations_display,
+            combined_xai_table=sanitize_display_dataframe(combined_xai_table),
             xai_consensus_summary=xai_consensus_summary,
             shap_method=explanation_bundle.get("shap_method", "fallback"),
             lime_method=explanation_bundle.get("lime_method", "fallback"),
             overall_summary=overall_summary,
             land_area=land_area,
             land_unit_display=land_unit_display,
-            estimated_yield=estimated_yield,
+            estimated_yield=estimated_yield_display,
             estimated_profit=estimated_profit_display,
             yield_profit_summary=yield_profit_summary_mr if lang == "mr" else yield_profit_summary_en,
             live_modal_price=live_price_display,
             market_name=market_name,
             price_date=price_date,
-            weather_city=city,
-            weather_temperature=temperature,
-            weather_humidity=humidity,
-            weather_rainfall=rainfall,
-            weather_latitude=final_latitude,
-            weather_longitude=final_longitude,
+            weather_city=sanitized_weather_city,
+            weather_temperature=sanitized_weather_temperature,
+            weather_humidity=sanitized_weather_humidity,
+            weather_rainfall=sanitized_weather_rainfall,
+            weather_latitude=sanitized_weather_latitude,
+            weather_longitude=sanitized_weather_longitude,
             current_season=translate_season_name(current_season, lang),
             current_season_raw=current_season,
-            sowing_guidance=sowing_guidance,
+            sowing_guidance=sanitized_sowing_guidance,
             show_feedback_prompt=feedback_prompt["show_feedback_prompt"],
             feedback_status=False,
             feedback_prediction_type="crop",
