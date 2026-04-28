@@ -20,9 +20,11 @@ from utils.crop_features import (
     CATEGORICAL_FEATURE_COLUMNS,
     FEATURE_COLUMNS as DEFAULT_FEATURE_COLUMNS,
     FEATURE_DISPLAY_NAMES as DEFAULT_FEATURE_NAMES,
+    INPUT_FEATURE_COLUMNS as DEFAULT_INPUT_FEATURE_COLUMNS,
     SEASON_OPTIONS,
     WATER_AVAILABILITY_OPTIONS,
     WATER_SOURCE_OPTIONS,
+    decode_categorical_feature_value,
     encode_feature_frame,
 )
 
@@ -66,6 +68,7 @@ metadata = load_metadata()
 
 FEATURE_COLUMNS = metadata.get("feature_columns", DEFAULT_FEATURE_COLUMNS)
 FEATURE_NAMES = metadata.get("feature_display_names", DEFAULT_FEATURE_NAMES)
+INPUT_FEATURE_COLUMNS = metadata.get("input_feature_columns", DEFAULT_INPUT_FEATURE_COLUMNS)
 FEATURE_REFERENCE = metadata.get("feature_reference", {})
 USES_SCALER = bool(metadata.get("uses_scaler", True))
 
@@ -81,14 +84,23 @@ def get_shap_explainer():
         return None
 
 
-def transform_input(input_df):
-    ordered_df = input_df[FEATURE_COLUMNS].copy()
+def prepare_model_input_frame(input_df):
+    ordered_df = input_df[INPUT_FEATURE_COLUMNS].copy()
     encoded_df = encode_feature_frame(ordered_df)
+    return ordered_df, encoded_df
 
+
+def scale_encoded_features(encoded_df):
     if USES_SCALER and scaler is not None and hasattr(scaler, "transform"):
         return scaler.transform(encoded_df)
 
     return encoded_df.to_numpy(dtype=float)
+
+
+def transform_input(input_df):
+    _, encoded_df = prepare_model_input_frame(input_df)
+
+    return scale_encoded_features(encoded_df)
 
 
 def predict_probabilities_from_df(input_df):
@@ -137,8 +149,8 @@ def get_reference_value(feature_name, fallback_value):
     reference = FEATURE_REFERENCE.get(feature_name, {})
     if feature_name in CATEGORICAL_FEATURE_COLUMNS:
         if "mode" in reference:
-            return str(reference["mode"])
-        return str(fallback_value)
+            return float(reference["mode"])
+        return float(fallback_value)
     if "mean" in reference:
         return float(reference["mean"])
     if "median" in reference:
@@ -146,32 +158,28 @@ def get_reference_value(feature_name, fallback_value):
     return float(fallback_value)
 
 
-def build_fallback_impacts(input_df, target_index):
-    _, base_probabilities = predict_probabilities_from_df(input_df)
+def build_fallback_impacts(encoded_input_df, target_index):
+    encoded_input_df = encoded_input_df.astype(float).copy()
+    base_scaled = scale_encoded_features(encoded_input_df)
+    base_probabilities = model.predict_proba(base_scaled)[0]
     base_probability = float(base_probabilities[target_index])
     impacts = []
 
     for feature_name in FEATURE_COLUMNS:
-        perturbed_df = input_df[FEATURE_COLUMNS].copy()
+        perturbed_df = encoded_input_df.copy()
         current_value = perturbed_df.iloc[0][feature_name]
-        if feature_name not in CATEGORICAL_FEATURE_COLUMNS:
-            perturbed_df[feature_name] = pd.to_numeric(
-                perturbed_df[feature_name],
-                errors="coerce",
-            ).astype(float)
         perturbed_df.at[perturbed_df.index[0], feature_name] = get_reference_value(
             feature_name,
             current_value,
         )
 
-        _, perturbed_probabilities = predict_probabilities_from_df(perturbed_df)
-        perturbed_probability = float(perturbed_probabilities[target_index])
+        perturbed_probability = float(model.predict_proba(scale_encoded_features(perturbed_df))[0][target_index])
         impacts.append(base_probability - perturbed_probability)
 
     return [float(value) for value in impacts]
 
 
-def get_feature_impacts(input_scaled, input_df, target_index):
+def get_feature_impacts(input_scaled, encoded_input_df, target_index):
     explainer = get_shap_explainer()
     if explainer is not None:
         try:
@@ -186,12 +194,12 @@ def get_feature_impacts(input_scaled, input_df, target_index):
         except Exception:
             pass
 
-    return build_fallback_impacts(input_df, target_index), "fallback"
+    return build_fallback_impacts(encoded_input_df, target_index), "fallback"
 
 
 def format_feature_value(feature_name, feature_value):
     if feature_name in CATEGORICAL_FEATURE_COLUMNS:
-        return str(feature_value)
+        return decode_categorical_feature_value(feature_name, feature_value)
     if feature_name in ["N", "P", "K"]:
         return str(int(round(float(feature_value))))
     return "{0:.2f}".format(float(feature_value))
@@ -238,8 +246,8 @@ def build_human_explanation(
     )
 
 
-def build_shap_output(prediction_name, top3_predictions, impact_values, input_df):
-    observed_values = [input_df.iloc[0][feature_name] for feature_name in FEATURE_COLUMNS]
+def build_shap_output(prediction_name, top3_predictions, impact_values, encoded_input_df):
+    observed_values = [encoded_input_df.iloc[0][feature_name] for feature_name in FEATURE_COLUMNS]
     shap_df = pd.DataFrame(
         {
             "Feature": FEATURE_NAMES,
@@ -281,7 +289,7 @@ def build_reference_background():
 
     for index in range(LIME_SYNTHETIC_ROWS):
         row = {}
-        for feature_name in FEATURE_COLUMNS:
+        for feature_name in INPUT_FEATURE_COLUMNS:
             reference = FEATURE_REFERENCE.get(feature_name, {})
 
             if feature_name == "season":
@@ -301,7 +309,7 @@ def build_reference_background():
 
         rows.append(row)
 
-    return pd.DataFrame(rows, columns=FEATURE_COLUMNS)
+    return pd.DataFrame(rows, columns=INPUT_FEATURE_COLUMNS)
 
 
 @lru_cache(maxsize=1)
@@ -312,8 +320,8 @@ def get_lime_background_df():
         if dataset_path.exists():
             try:
                 dataset = pd.read_csv(dataset_path)
-                if set(FEATURE_COLUMNS).issubset(dataset.columns):
-                    background_df = dataset[FEATURE_COLUMNS].dropna().copy()
+                if set(INPUT_FEATURE_COLUMNS).issubset(dataset.columns):
+                    background_df = dataset[INPUT_FEATURE_COLUMNS].dropna().copy()
                     if len(background_df) > LIME_BACKGROUND_ROWS:
                         background_df = background_df.sample(
                             n=LIME_BACKGROUND_ROWS,
@@ -352,11 +360,11 @@ def get_lime_explainer():
 
 def build_lime_output_from_pairs(
     prediction_name,
-    input_df,
+    encoded_input_df,
     weighted_pairs,
     method_name,
 ):
-    observed_values = {feature_name: input_df.iloc[0][feature_name] for feature_name in FEATURE_COLUMNS}
+    observed_values = {feature_name: encoded_input_df.iloc[0][feature_name] for feature_name in FEATURE_COLUMNS}
     rows = []
 
     for feature_index, weight in weighted_pairs:
@@ -400,8 +408,8 @@ def build_lime_output_from_pairs(
     return lime_table, lime_df, lime_lines, method_name
 
 
-def build_lime_fallback(input_df, target_index, prediction_name):
-    fallback_impacts = build_fallback_impacts(input_df, target_index)
+def build_lime_fallback(encoded_input_df, target_index, prediction_name):
+    fallback_impacts = build_fallback_impacts(encoded_input_df, target_index)
     ranked_pairs = sorted(
         enumerate(fallback_impacts),
         key=lambda item: abs(item[1]),
@@ -409,13 +417,13 @@ def build_lime_fallback(input_df, target_index, prediction_name):
     )[:MAX_LIME_FEATURES]
     return build_lime_output_from_pairs(
         prediction_name,
-        input_df,
+        encoded_input_df,
         ranked_pairs,
         "fallback",
     )
 
 
-def get_lime_explanation(input_scaled, input_df, target_index, prediction_name):
+def get_lime_explanation(input_scaled, encoded_input_df, target_index, prediction_name):
     explainer = get_lime_explainer()
     if explainer is not None:
         try:
@@ -429,14 +437,14 @@ def get_lime_explanation(input_scaled, input_df, target_index, prediction_name):
             if explanation_map:
                 return build_lime_output_from_pairs(
                     prediction_name,
-                    input_df,
+                    encoded_input_df,
                     explanation_map,
                     "lime",
                 )
         except Exception:
             pass
 
-    return build_lime_fallback(input_df, target_index, prediction_name)
+    return build_lime_fallback(encoded_input_df, target_index, prediction_name)
 
 
 def build_consensus_summary(prediction_name, shap_df, lime_df):
@@ -499,17 +507,17 @@ def build_consensus_summary(prediction_name, shap_df, lime_df):
     return " ".join(summary_parts)
 
 
-def build_explanation_bundle(prediction_name, top3_predictions, input_scaled, input_df, target_index):
-    impact_values, shap_method = get_feature_impacts(input_scaled, input_df, target_index)
+def build_explanation_bundle(prediction_name, top3_predictions, input_scaled, encoded_input_df, target_index):
+    impact_values, shap_method = get_feature_impacts(input_scaled, encoded_input_df, target_index)
     shap_table, shap_detail_table, shap_lines, _, _ = build_shap_output(
         prediction_name,
         top3_predictions,
         impact_values,
-        input_df,
+        encoded_input_df,
     )
     lime_table, lime_detail_table, lime_lines, lime_method = get_lime_explanation(
         input_scaled,
-        input_df,
+        encoded_input_df,
         target_index,
         prediction_name,
     )
@@ -534,19 +542,23 @@ def build_explanation_bundle(prediction_name, top3_predictions, input_scaled, in
 
 
 def explain_crop_prediction_bundle(input_df):
-    input_scaled, probabilities = predict_probabilities_from_df(input_df)
+    _, encoded_input_df = prepare_model_input_frame(input_df)
+    input_scaled = scale_encoded_features(encoded_input_df)
+    probabilities = model.predict_proba(input_scaled)[0]
     best_index, best_prediction, top3_predictions = get_top_predictions(probabilities)
     return build_explanation_bundle(
         best_prediction,
         top3_predictions,
         input_scaled,
-        input_df,
+        encoded_input_df,
         best_index,
     )
 
 
 def explain_specific_crop_prediction_bundle(input_df, crop_name, top3_predictions=None):
-    input_scaled, probabilities = predict_probabilities_from_df(input_df)
+    _, encoded_input_df = prepare_model_input_frame(input_df)
+    input_scaled = scale_encoded_features(encoded_input_df)
+    probabilities = model.predict_proba(input_scaled)[0]
     if top3_predictions is None:
         _, _, top3_predictions = get_top_predictions(probabilities)
 
@@ -555,7 +567,7 @@ def explain_specific_crop_prediction_bundle(input_df, crop_name, top3_prediction
         crop_name,
         top3_predictions,
         input_scaled,
-        input_df,
+        encoded_input_df,
         target_index,
     )
 

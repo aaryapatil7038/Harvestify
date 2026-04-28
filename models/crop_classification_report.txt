@@ -1,36 +1,36 @@
               precision    recall  f1-score   support
 
-       bajra       0.98      0.97      0.98       120
-      banana       1.00      1.00      1.00       120
-   blackgram       0.58      0.52      0.55       120
-     brinjal       0.95      0.91      0.93       120
-     cabbage       0.97      0.95      0.96       120
-       chili       0.81      0.79      0.80       120
-      cotton       1.00      1.00      1.00       120
-      cowpea       0.73      0.68      0.70       120
-      ginger       1.00      1.00      1.00       120
-        gram       0.80      0.82      0.81       120
-      grapes       1.00      1.00      1.00       120
-   groundnut       0.95      0.97      0.96       120
-       jowar       0.97      0.96      0.96       120
-      lentil       0.82      0.79      0.81       120
-       maize       1.00      1.00      1.00       120
-    mungbean       0.73      0.87      0.79       120
-       onion       0.64      0.66      0.65       120
-      orange       0.86      0.89      0.87       120
- pomegranate       0.98      0.99      0.98       120
-      potato       0.95      0.97      0.96       120
-        ragi       1.00      1.00      1.00       120
-        rice       1.00      1.00      1.00       120
-      sesame       0.90      0.86      0.88       120
-     soybean       1.00      1.00      1.00       120
-   sugarcane       1.00      1.00      1.00       120
-   sunflower       0.97      0.97      0.97       120
-      tomato       0.66      0.64      0.65       120
-         tur       0.86      0.89      0.87       120
-    turmeric       1.00      1.00      1.00       120
-       wheat       1.00      1.00      1.00       120
+       bajra       0.97      0.95      0.96       200
+      banana       1.00      1.00      1.00       200
+   blackgram       0.64      0.57      0.60       200
+     brinjal       0.91      0.95      0.93       200
+     cabbage       0.98      0.99      0.98       200
+       chili       0.97      0.89      0.93       200
+      cotton       1.00      1.00      1.00       200
+      cowpea       0.69      0.72      0.71       200
+      ginger       1.00      1.00      1.00       200
+        gram       0.98      0.89      0.93       200
+      grapes       1.00      1.00      1.00       200
+   groundnut       0.97      0.97      0.97       200
+       jowar       0.95      0.93      0.94       200
+      lentil       0.90      0.98      0.94       200
+       maize       1.00      1.00      1.00       200
+    mungbean       0.79      0.80      0.80       200
+       onion       0.53      0.55      0.54       200
+      orange       0.90      0.91      0.90       200
+ pomegranate       1.00      1.00      1.00       200
+      potato       0.99      0.97      0.98       200
+        ragi       0.99      0.99      0.99       200
+        rice       1.00      1.00      1.00       200
+      sesame       0.87      0.94      0.90       200
+     soybean       0.99      0.99      0.99       200
+   sugarcane       1.00      1.00      1.00       200
+   sunflower       0.95      0.97      0.96       200
+      tomato       0.54      0.52      0.53       200
+         tur       0.95      0.93      0.94       200
+    turmeric       1.00      1.00      1.00       200
+       wheat       1.00      1.00      1.00       200
 
-    accuracy                           0.90      3600
-   macro avg       0.90      0.90      0.90      3600
-weighted avg       0.90      0.90      0.90      3600
+    accuracy                           0.91      6000
+   macro avg       0.91      0.91      0.91      6000
+weighted avg       0.91      0.91      0.91      6000

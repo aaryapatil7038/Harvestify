@@ -1,6 +1,6 @@
 # Importing essential libraries and modules
 import csv
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, send_from_directory, send_file
 from markupsafe import Markup
 import pandas as pd
 import pickle
@@ -12,6 +12,7 @@ import threading
 import requests
 from datetime import date, timedelta, datetime, timezone
 from functools import lru_cache
+from PIL import Image, ImageDraw, ImageFont
 
 
 def load_local_env():
@@ -92,6 +93,307 @@ def sanitize_display_dataframe(df, fallback="N/A"):
             lambda value: sanitize_display_value(value, fallback)
         )
     return sanitized_df
+
+
+PDF_PAGE_SIZE = (1240, 1754)
+PDF_PAGE_MARGIN = 88
+PDF_CONTENT_WIDTH = PDF_PAGE_SIZE[0] - (PDF_PAGE_MARGIN * 2)
+PDF_BACKGROUND_COLOR = "#fffdf9"
+PDF_TEXT_COLOR = "#24362b"
+PDF_MUTED_TEXT_COLOR = "#55685c"
+PDF_SECTION_COLOR = "#2f7b57"
+PDF_RULE_COLOR = "#d9d2c4"
+PDF_FONT_CANDIDATES = {
+    "mr": [
+        r"C:\Windows\Fonts\Nirmala.ttc",
+        r"C:\Windows\Fonts\segoeui.ttf",
+        r"C:\Windows\Fonts\arial.ttf",
+    ],
+    "en": [
+        r"C:\Windows\Fonts\seguisb.ttf",
+        r"C:\Windows\Fonts\segoeui.ttf",
+        r"C:\Windows\Fonts\arial.ttf",
+    ],
+}
+
+
+@lru_cache(maxsize=None)
+def load_pdf_font(lang, size):
+    candidate_paths = PDF_FONT_CANDIDATES.get(lang, PDF_FONT_CANDIDATES["en"])
+
+    for font_path in candidate_paths:
+        if not os.path.exists(font_path):
+            continue
+        try:
+            return ImageFont.truetype(font_path, size)
+        except OSError:
+            continue
+
+    return ImageFont.load_default()
+
+
+def wrap_pdf_text(draw, text, font, max_width):
+    text_value = str(text or "").strip()
+    if not text_value:
+        return [""]
+
+    wrapped_lines = []
+    for paragraph in text_value.splitlines():
+        words = paragraph.split()
+        if not words:
+            wrapped_lines.append("")
+            continue
+
+        current_line = words[0]
+        for word in words[1:]:
+            candidate = "{0} {1}".format(current_line, word)
+            if draw.textlength(candidate, font=font) <= max_width:
+                current_line = candidate
+                continue
+
+            wrapped_lines.append(current_line)
+            current_line = word
+
+        wrapped_lines.append(current_line)
+
+    return wrapped_lines or [""]
+
+
+def normalize_pdf_value(value):
+    if isinstance(value, float):
+        return "{0:.2f}".format(value).rstrip("0").rstrip(".")
+
+    return str(sanitize_display_value(value))
+
+
+def build_crop_pdf_filename(prediction_raw):
+    base_name = re.sub(r"[^a-z0-9]+", "-", str(prediction_raw or "").lower()).strip("-")
+    if not base_name:
+        base_name = "crop"
+    return "{0}-prediction-report.pdf".format(base_name)
+
+
+def build_crop_result_context(saved_result, lang):
+    current_season_raw = saved_result.get("current_season")
+    feedback_prompt_visible = saved_result.get("show_feedback_prompt", False) and not saved_result.get("feedback_submitted", False)
+    shap_table_df = pd.DataFrame(saved_result.get("explanation", []))
+    lime_table_df = pd.DataFrame(saved_result.get("lime_explanation", []))
+
+    bundle = {
+        "prediction": saved_result["prediction_raw"],
+        "top3_predictions": saved_result["top3_predictions"],
+        "shap_table": shap_table_df,
+        "shap_lines": saved_result.get("explanations", []),
+        "lime_table": lime_table_df,
+        "lime_lines": saved_result.get("lime_explanations", []),
+    }
+    localized_xai = localize_crop_xai_bundle(bundle, lang)
+    sanitized_sowing_guidance = sanitize_display_mapping(
+        get_crop_sowing_guidance(saved_result["prediction_raw"], lang)
+    )
+
+    return {
+        "lang": lang,
+        "ui": UI_TEXT[lang],
+        "prediction": localized_xai["prediction"],
+        "prediction_raw": saved_result["prediction_raw"],
+        "top3_predictions": localized_xai["top3_predictions"],
+        "top3_predictions_raw": saved_result["top3_predictions"],
+        "combined_xai_table": sanitize_display_dataframe(localized_xai["combined_table"]),
+        "xai_consensus_summary": localized_xai["consensus_summary"],
+        "shap_method": saved_result.get("shap_method", "fallback"),
+        "lime_method": saved_result.get("lime_method", "fallback"),
+        "overall_summary": generate_overall_summary(
+            saved_result["prediction_raw"],
+            saved_result["top3_predictions"],
+            shap_table_df,
+            lang
+        ),
+        "land_area": saved_result["land_area"],
+        "land_unit_display": ("à¤à¤•à¤°" if saved_result["land_unit"] == "acre" else "à¤¹à¥‡à¤•à¥à¤Ÿà¤°") if lang == "mr"
+        else ("Acre" if saved_result["land_unit"] == "acre" else "Hectare"),
+        "estimated_yield": sanitize_display_value(saved_result["estimated_yield"]),
+        "estimated_profit": sanitize_display_value(saved_result["estimated_profit"]),
+        "yield_profit_summary": (
+            saved_result["yield_profit_summary_mr"] if lang == "mr"
+            else saved_result["yield_profit_summary_en"]
+        ).replace("nan", "N/A"),
+        "live_modal_price": sanitize_display_value(saved_result["live_modal_price"]),
+        "market_name": sanitize_display_value(saved_result["market_name"]),
+        "price_date": sanitize_display_value(saved_result["price_date"]),
+        "weather_city": sanitize_display_value(saved_result.get("weather_city")),
+        "weather_temperature": sanitize_display_value(saved_result.get("weather_temperature")),
+        "weather_humidity": sanitize_display_value(saved_result.get("weather_humidity")),
+        "weather_rainfall": sanitize_display_value(saved_result.get("weather_rainfall")),
+        "weather_latitude": sanitize_display_value(saved_result.get("weather_latitude")),
+        "weather_longitude": sanitize_display_value(saved_result.get("weather_longitude")),
+        "current_season": translate_season_name(current_season_raw, lang),
+        "current_season_raw": current_season_raw,
+        "sowing_guidance": sanitized_sowing_guidance,
+        "show_feedback_prompt": feedback_prompt_visible,
+        "feedback_status": request.args.get("feedback") == "submitted",
+        "feedback_prediction_type": "crop",
+        "feedback_prediction_name": saved_result["prediction_raw"],
+        "feedback_prediction_count": saved_result.get("prediction_count"),
+        "current_result_url": url_for("crop_result_page", lang=lang),
+        "title": "à¤ªà¥€à¤• à¤¨à¤¿à¤•à¤¾à¤²" if lang == "mr" else "Crop Result",
+    }
+
+
+def build_crop_result_pdf(context):
+    lang = context["lang"]
+    ui = context["ui"]
+    title_font = load_pdf_font(lang, 42)
+    heading_font = load_pdf_font(lang, 26)
+    body_font = load_pdf_font(lang, 20)
+    small_font = load_pdf_font(lang, 16)
+
+    pages = []
+
+    def create_page():
+        page = Image.new("RGB", PDF_PAGE_SIZE, PDF_BACKGROUND_COLOR)
+        draw = ImageDraw.Draw(page)
+        return {"image": page, "draw": draw, "y": PDF_PAGE_MARGIN}
+
+    current_page = create_page()
+    pages.append(current_page)
+
+    def ensure_space(required_height):
+        nonlocal current_page
+        remaining = PDF_PAGE_SIZE[1] - PDF_PAGE_MARGIN - current_page["y"]
+        if required_height <= remaining:
+            return
+        current_page = create_page()
+        pages.append(current_page)
+
+    def write_rule(spacing_top=8, spacing_bottom=18):
+        ensure_space(spacing_top + spacing_bottom + 2)
+        current_page["y"] += spacing_top
+        y = current_page["y"]
+        current_page["draw"].line(
+            [(PDF_PAGE_MARGIN, y), (PDF_PAGE_SIZE[0] - PDF_PAGE_MARGIN, y)],
+            fill=PDF_RULE_COLOR,
+            width=2
+        )
+        current_page["y"] += spacing_bottom
+
+    def write_text(text, font, fill=PDF_TEXT_COLOR, extra_spacing=8):
+        lines = wrap_pdf_text(current_page["draw"], text, font, PDF_CONTENT_WIDTH)
+        line_height = font.size + 10
+        ensure_space((line_height * len(lines)) + extra_spacing)
+        for line in lines:
+            current_page["draw"].text(
+                (PDF_PAGE_MARGIN, current_page["y"]),
+                line,
+                font=font,
+                fill=fill
+            )
+            current_page["y"] += line_height
+        current_page["y"] += extra_spacing
+
+    def write_section_heading(text):
+        write_text(text, heading_font, fill=PDF_SECTION_COLOR, extra_spacing=4)
+
+    def write_label_value(label, value):
+        if is_invalid_display_value(value):
+            return
+        write_text("{0}: {1}".format(label, normalize_pdf_value(value)), body_font, extra_spacing=4)
+
+    write_text(context["title"], title_font, fill=PDF_SECTION_COLOR, extra_spacing=4)
+    generated_label = "PDF generated on" if lang != "mr" else "PDF à¤¤à¤¯à¤¾à¤° à¤•à¥‡à¤²à¥‡à¤²à¥€ à¤µà¥‡à¤³"
+    write_text(
+        "{0}: {1}".format(generated_label, datetime.now().strftime("%d %b %Y, %H:%M")),
+        small_font,
+        fill=PDF_MUTED_TEXT_COLOR,
+        extra_spacing=10
+    )
+    write_rule(spacing_top=0, spacing_bottom=18)
+
+    write_section_heading(ui.get("best_crop", "Recommended Crop"))
+    write_text(context["prediction"], heading_font, extra_spacing=10)
+
+    overall_summary = sanitize_display_value(context.get("overall_summary"))
+    if not is_invalid_display_value(overall_summary):
+        write_text(overall_summary, body_font, extra_spacing=12)
+
+    write_section_heading(ui.get("yield_profit_summary", "Yield and Profit Summary"))
+    write_label_value(ui.get("land_area", "Land Area"), "{0} {1}".format(normalize_pdf_value(context["land_area"]), context["land_unit_display"]))
+    write_label_value(ui.get("estimated_yield", "Estimated Yield"), context["estimated_yield"])
+    write_label_value(ui.get("estimated_profit", "Estimated Profit"), context["estimated_profit"])
+    write_text(context["yield_profit_summary"], body_font, extra_spacing=12)
+
+    write_section_heading(ui.get("weather_heading", "Weather"))
+    write_label_value(ui.get("weather_city", "City"), context["weather_city"])
+    write_label_value(ui.get("temperature", "Temperature"), context["weather_temperature"])
+    write_label_value(ui.get("humidity", "Humidity"), context["weather_humidity"])
+    write_label_value(ui.get("rainfall", "Rainfall"), context["weather_rainfall"])
+    write_label_value(ui.get("current_season", "Current Season"), context["current_season"])
+    write_label_value(ui.get("location_coordinates", "Coordinates"), "{0}, {1}".format(normalize_pdf_value(context["weather_latitude"]), normalize_pdf_value(context["weather_longitude"])))
+    write_text("", body_font, extra_spacing=6)
+
+    write_section_heading(ui.get("market_snapshot", "Market Snapshot"))
+    write_label_value(ui.get("modal_price", "Modal Price"), context["live_modal_price"])
+    write_label_value(ui.get("market_name", "Market"), context["market_name"])
+    write_label_value(ui.get("price_date", "Price Date"), context["price_date"])
+
+    if isinstance(context.get("sowing_guidance"), dict) and context["sowing_guidance"]:
+        write_section_heading(ui.get("sowing_guidance", "Sowing Guidance"))
+        for key, value in context["sowing_guidance"].items():
+            write_label_value(str(key), value)
+
+    top3_predictions = context.get("top3_predictions") or []
+    if top3_predictions:
+        write_section_heading(ui.get("top3_predictions", "Top 3 Predictions"))
+        for index, item in enumerate(top3_predictions, start=1):
+            crop_name = item.get("crop", "N/A")
+            confidence = normalize_pdf_value(item.get("confidence", "N/A"))
+            write_text(
+                "{0}. {1} - {2}%".format(index, crop_name, confidence),
+                body_font,
+                extra_spacing=3
+            )
+        current_page["y"] += 6
+
+    consensus_summary = sanitize_display_value(context.get("xai_consensus_summary"))
+    combined_table = context.get("combined_xai_table")
+    has_combined_rows = hasattr(combined_table, "empty") and not combined_table.empty
+    if not is_invalid_display_value(consensus_summary) or has_combined_rows:
+        write_section_heading("Combined SHAP + LIME View")
+
+        if not is_invalid_display_value(consensus_summary):
+            write_text(consensus_summary, body_font, extra_spacing=8)
+
+        if has_combined_rows:
+            for _, row in combined_table.head(10).iterrows():
+                feature = normalize_pdf_value(row.get("Feature", "N/A"))
+                shap_value = normalize_pdf_value(row.get("SHAP Impact", "N/A"))
+                lime_value = normalize_pdf_value(row.get("LIME Weight", "N/A"))
+                effect = normalize_pdf_value(row.get("Combined Effect", row.get("Effect", "N/A")))
+                write_text(
+                    "{0}: SHAP {1} | LIME {2} | {3}".format(feature, shap_value, lime_value, effect),
+                    body_font,
+                    extra_spacing=3
+                )
+
+    footer_template = "Page {0}" if lang != "mr" else "à¤ªà¥ƒà¤·à¥à¤  {0}"
+    for index, page in enumerate(pages, start=1):
+        footer_text = footer_template.format(index)
+        footer_width = page["draw"].textlength(footer_text, font=small_font)
+        footer_x = PDF_PAGE_SIZE[0] - PDF_PAGE_MARGIN - footer_width
+        footer_y = PDF_PAGE_SIZE[1] - PDF_PAGE_MARGIN + 20
+        page["draw"].text((footer_x, footer_y), footer_text, font=small_font, fill=PDF_MUTED_TEXT_COLOR)
+
+    pdf_buffer = io.BytesIO()
+    page_images = [page["image"] for page in pages]
+    page_images[0].save(
+        pdf_buffer,
+        format="PDF",
+        save_all=True,
+        append_images=page_images[1:],
+        resolution=150.0
+    )
+    pdf_buffer.seek(0)
+    return pdf_buffer
 
 # ==============================================================================================
 # ------------------------- LOADING THE TRAINED MODELS ------------------------------------------
@@ -468,6 +770,34 @@ UI_TEXT["mr"].update({
     "lime_weight": "LIME \u0935\u091c\u0928",
     "combined_effect": "\u090f\u0915\u0924\u094d\u0930\u093f\u0924 \u092a\u0930\u093f\u0923\u093e\u092e",
     "mixed": "\U0001f7e1 \u092e\u093f\u0936\u094d\u0930 \u0938\u0902\u0915\u0947\u0924"
+})
+
+UI_TEXT["en"].update({
+    "crop_result_title": "Crop Result",
+    "yield_profit_section": "Yield and Profit Summary",
+    "weather_heading": "Weather",
+    "weather_city": "City",
+    "current_season": "Current Season",
+    "location_coordinates": "Coordinates",
+    "market_snapshot": "Market Snapshot",
+    "modal_price": "Modal Price",
+    "sowing_guidance": "Sowing Guidance",
+    "pdf_generated_on": "PDF generated on",
+    "pdf_page_label": "Page {0}"
+})
+
+UI_TEXT["mr"].update({
+    "crop_result_title": "\u092a\u0940\u0915 \u0928\u093f\u0915\u093e\u0932",
+    "yield_profit_section": "\u0909\u0924\u094d\u092a\u093e\u0926\u0928 \u0906\u0923\u093f \u0928\u092b\u093e \u0906\u0922\u093e\u0935\u093e",
+    "weather_heading": "\u0939\u0935\u093e\u092e\u093e\u0928",
+    "weather_city": "\u0936\u0939\u0930",
+    "current_season": "\u0938\u0927\u094d\u092f\u093e\u091a\u093e \u0939\u0902\u0917\u093e\u092e",
+    "location_coordinates": "\u0928\u093f\u0930\u094d\u0926\u0947\u0936\u093e\u0902\u0915",
+    "market_snapshot": "\u092c\u093e\u091c\u093e\u0930 \u092e\u093e\u0939\u093f\u0924\u0940",
+    "modal_price": "\u092e\u094b\u0921\u0932 \u092d\u093e\u0935",
+    "sowing_guidance": "\u092a\u0947\u0930\u0923\u0940 \u092e\u093e\u0930\u094d\u0917\u0926\u0930\u094d\u0936\u0928",
+    "pdf_generated_on": "PDF \u0924\u092f\u093e\u0930 \u0915\u0947\u0932\u0947\u0932\u0940 \u0935\u0947\u0933",
+    "pdf_page_label": "\u092a\u0943\u0937\u094d\u0920 {0}"
 })
 
 CROP_TRANSLATIONS = {
@@ -2049,7 +2379,235 @@ def localize_crop_xai_bundle(bundle, lang):
     }
 
 
+def build_crop_result_context(saved_result, lang):
+    ui = UI_TEXT[lang]
+    current_season_raw = saved_result.get("current_season")
+    feedback_prompt_visible = saved_result.get("show_feedback_prompt", False) and not saved_result.get("feedback_submitted", False)
+    shap_table_df = pd.DataFrame(saved_result.get("explanation", []))
+    lime_table_df = pd.DataFrame(saved_result.get("lime_explanation", []))
+
+    bundle = {
+        "prediction": saved_result["prediction_raw"],
+        "top3_predictions": saved_result["top3_predictions"],
+        "shap_table": shap_table_df,
+        "shap_lines": saved_result.get("explanations", []),
+        "lime_table": lime_table_df,
+        "lime_lines": saved_result.get("lime_explanations", []),
+    }
+    localized_xai = localize_crop_xai_bundle(bundle, lang)
+    sanitized_sowing_guidance = sanitize_display_mapping(
+        get_crop_sowing_guidance(saved_result["prediction_raw"], lang)
+    )
+
+    return {
+        "lang": lang,
+        "ui": ui,
+        "prediction": localized_xai["prediction"],
+        "prediction_raw": saved_result["prediction_raw"],
+        "top3_predictions": localized_xai["top3_predictions"],
+        "top3_predictions_raw": saved_result["top3_predictions"],
+        "combined_xai_table": sanitize_display_dataframe(localized_xai["combined_table"]),
+        "xai_consensus_summary": localized_xai["consensus_summary"],
+        "shap_method": saved_result.get("shap_method", "fallback"),
+        "lime_method": saved_result.get("lime_method", "fallback"),
+        "overall_summary": generate_overall_summary(
+            saved_result["prediction_raw"],
+            saved_result["top3_predictions"],
+            shap_table_df,
+            lang
+        ),
+        "land_area": saved_result["land_area"],
+        "land_unit_display": ui["acre"] if saved_result["land_unit"] == "acre" else ui["hectare"],
+        "estimated_yield": sanitize_display_value(saved_result["estimated_yield"]),
+        "estimated_profit": sanitize_display_value(saved_result["estimated_profit"]),
+        "yield_profit_summary": (
+            saved_result["yield_profit_summary_mr"] if lang == "mr"
+            else saved_result["yield_profit_summary_en"]
+        ).replace("nan", "N/A"),
+        "live_modal_price": sanitize_display_value(saved_result["live_modal_price"]),
+        "market_name": sanitize_display_value(saved_result["market_name"]),
+        "price_date": sanitize_display_value(saved_result["price_date"]),
+        "weather_city": sanitize_display_value(saved_result.get("weather_city")),
+        "weather_temperature": sanitize_display_value(saved_result.get("weather_temperature")),
+        "weather_humidity": sanitize_display_value(saved_result.get("weather_humidity")),
+        "weather_rainfall": sanitize_display_value(saved_result.get("weather_rainfall")),
+        "weather_latitude": sanitize_display_value(saved_result.get("weather_latitude")),
+        "weather_longitude": sanitize_display_value(saved_result.get("weather_longitude")),
+        "current_season": translate_season_name(current_season_raw, lang),
+        "current_season_raw": current_season_raw,
+        "sowing_guidance": sanitized_sowing_guidance,
+        "show_feedback_prompt": feedback_prompt_visible,
+        "feedback_status": request.args.get("feedback") == "submitted",
+        "feedback_prediction_type": "crop",
+        "feedback_prediction_name": saved_result["prediction_raw"],
+        "feedback_prediction_count": saved_result.get("prediction_count"),
+        "current_result_url": url_for("crop_result_page", lang=lang),
+        "title": ui.get("crop_result_title", "Crop Result"),
+    }
+
+
+def build_crop_result_pdf(context):
+    lang = context["lang"]
+    ui = context["ui"]
+    title_font = load_pdf_font(lang, 42)
+    heading_font = load_pdf_font(lang, 26)
+    body_font = load_pdf_font(lang, 20)
+    small_font = load_pdf_font(lang, 16)
+
+    pages = []
+
+    def create_page():
+        page = Image.new("RGB", PDF_PAGE_SIZE, PDF_BACKGROUND_COLOR)
+        draw = ImageDraw.Draw(page)
+        return {"image": page, "draw": draw, "y": PDF_PAGE_MARGIN}
+
+    current_page = create_page()
+    pages.append(current_page)
+
+    def ensure_space(required_height):
+        nonlocal current_page
+        remaining = PDF_PAGE_SIZE[1] - PDF_PAGE_MARGIN - current_page["y"]
+        if required_height <= remaining:
+            return
+        current_page = create_page()
+        pages.append(current_page)
+
+    def write_rule(spacing_top=8, spacing_bottom=18):
+        ensure_space(spacing_top + spacing_bottom + 2)
+        current_page["y"] += spacing_top
+        y = current_page["y"]
+        current_page["draw"].line(
+            [(PDF_PAGE_MARGIN, y), (PDF_PAGE_SIZE[0] - PDF_PAGE_MARGIN, y)],
+            fill=PDF_RULE_COLOR,
+            width=2
+        )
+        current_page["y"] += spacing_bottom
+
+    def write_text(text, font, fill=PDF_TEXT_COLOR, extra_spacing=8):
+        lines = wrap_pdf_text(current_page["draw"], text, font, PDF_CONTENT_WIDTH)
+        line_height = font.size + 10
+        ensure_space((line_height * len(lines)) + extra_spacing)
+        for line in lines:
+            current_page["draw"].text(
+                (PDF_PAGE_MARGIN, current_page["y"]),
+                line,
+                font=font,
+                fill=fill
+            )
+            current_page["y"] += line_height
+        current_page["y"] += extra_spacing
+
+    def write_section_heading(text):
+        write_text(text, heading_font, fill=PDF_SECTION_COLOR, extra_spacing=4)
+
+    def write_label_value(label, value):
+        if is_invalid_display_value(value):
+            return
+        write_text("{0}: {1}".format(label, normalize_pdf_value(value)), body_font, extra_spacing=4)
+
+    write_text(context["title"], title_font, fill=PDF_SECTION_COLOR, extra_spacing=4)
+    generated_label = ui.get("pdf_generated_on", "PDF generated on")
+    write_text(
+        "{0}: {1}".format(generated_label, datetime.now().strftime("%d %b %Y, %H:%M")),
+        small_font,
+        fill=PDF_MUTED_TEXT_COLOR,
+        extra_spacing=10
+    )
+    write_rule(spacing_top=0, spacing_bottom=18)
+
+    write_section_heading(ui.get("best_crop", "Recommended Crop"))
+    write_text(context["prediction"], heading_font, extra_spacing=10)
+
+    overall_summary = sanitize_display_value(context.get("overall_summary"))
+    if not is_invalid_display_value(overall_summary):
+        write_text(overall_summary, body_font, extra_spacing=12)
+
+    write_section_heading(ui.get("yield_profit_section", "Yield and Profit Summary"))
+    write_label_value(ui.get("land_area", "Land Area"), "{0} {1}".format(normalize_pdf_value(context["land_area"]), context["land_unit_display"]))
+    write_label_value(ui.get("estimated_yield", "Estimated Yield"), context["estimated_yield"])
+    write_label_value(ui.get("estimated_profit", "Estimated Profit"), context["estimated_profit"])
+    write_text(context["yield_profit_summary"], body_font, extra_spacing=12)
+
+    write_section_heading(ui.get("weather_heading", "Weather"))
+    write_label_value(ui.get("weather_city", "City"), context["weather_city"])
+    write_label_value(ui.get("temperature", "Temperature"), context["weather_temperature"])
+    write_label_value(ui.get("humidity", "Humidity"), context["weather_humidity"])
+    write_label_value(ui.get("rainfall", "Rainfall"), context["weather_rainfall"])
+    write_label_value(ui.get("current_season", "Current Season"), context["current_season"])
+    write_label_value(
+        ui.get("location_coordinates", "Coordinates"),
+        "{0}, {1}".format(normalize_pdf_value(context["weather_latitude"]), normalize_pdf_value(context["weather_longitude"]))
+    )
+    write_text("", body_font, extra_spacing=6)
+
+    write_section_heading(ui.get("market_snapshot", "Market Snapshot"))
+    write_label_value(ui.get("modal_price", "Modal Price"), context["live_modal_price"])
+    write_label_value(ui.get("market_name", "Market"), context["market_name"])
+    write_label_value(ui.get("price_date", "Price Date"), context["price_date"])
+
+    if isinstance(context.get("sowing_guidance"), dict) and context["sowing_guidance"]:
+        write_section_heading(ui.get("sowing_guidance", "Sowing Guidance"))
+        for key, value in context["sowing_guidance"].items():
+            write_label_value(str(key), value)
+
+    top3_predictions = context.get("top3_predictions") or []
+    if top3_predictions:
+        write_section_heading(ui.get("top3", "Top 3 Predictions"))
+        for index, item in enumerate(top3_predictions, start=1):
+            crop_name = item.get("crop", "N/A")
+            confidence = normalize_pdf_value(item.get("confidence", "N/A"))
+            write_text(
+                "{0}. {1} - {2}%".format(index, crop_name, confidence),
+                body_font,
+                extra_spacing=3
+            )
+        current_page["y"] += 6
+
+    consensus_summary = sanitize_display_value(context.get("xai_consensus_summary"))
+    combined_table = context.get("combined_xai_table")
+    has_combined_rows = hasattr(combined_table, "empty") and not combined_table.empty
+    if not is_invalid_display_value(consensus_summary) or has_combined_rows:
+        write_section_heading(ui.get("combined_xai_title", "Combined SHAP + LIME View"))
+
+        if not is_invalid_display_value(consensus_summary):
+            write_text(consensus_summary, body_font, extra_spacing=8)
+
+        if has_combined_rows:
+            for _, row in combined_table.head(10).iterrows():
+                feature = normalize_pdf_value(row.get("Feature", "N/A"))
+                shap_value = normalize_pdf_value(row.get("SHAP Impact", "N/A"))
+                lime_value = normalize_pdf_value(row.get("LIME Weight", "N/A"))
+                effect = normalize_pdf_value(row.get("Combined Effect", row.get("Effect", "N/A")))
+                write_text(
+                    "{0}: SHAP {1} | LIME {2} | {3}".format(feature, shap_value, lime_value, effect),
+                    body_font,
+                    extra_spacing=3
+                )
+
+    footer_template = ui.get("pdf_page_label", "Page {0}")
+    for index, page in enumerate(pages, start=1):
+        footer_text = footer_template.format(index)
+        footer_width = page["draw"].textlength(footer_text, font=small_font)
+        footer_x = PDF_PAGE_SIZE[0] - PDF_PAGE_MARGIN - footer_width
+        footer_y = PDF_PAGE_SIZE[1] - PDF_PAGE_MARGIN + 20
+        page["draw"].text((footer_x, footer_y), footer_text, font=small_font, fill=PDF_MUTED_TEXT_COLOR)
+
+    pdf_buffer = io.BytesIO()
+    page_images = [page["image"] for page in pages]
+    page_images[0].save(
+        pdf_buffer,
+        format="PDF",
+        save_all=True,
+        append_images=page_images[1:],
+        resolution=150.0
+    )
+    pdf_buffer.seek(0)
+    return pdf_buffer
+
+
 def render_saved_crop_result(saved_result, lang):
+    return render_template("crop-result.html", **build_crop_result_context(saved_result, lang))
+
     current_season_raw = saved_result.get("current_season")
     feedback_prompt_visible = saved_result.get("show_feedback_prompt", False) and not saved_result.get("feedback_submitted", False)
     shap_table_df = pd.DataFrame(saved_result.get("explanation", []))
@@ -2242,6 +2800,26 @@ def crop_result_page():
         return redirect(url_for("crop_recommend", lang=lang))
 
     return render_saved_crop_result(saved_result, lang)
+
+
+@app.route('/crop-result.pdf')
+def crop_result_pdf():
+    lang = get_lang()
+    saved_result = session.get("last_crop_result")
+
+    if not saved_result:
+        return redirect(url_for("crop_recommend", lang=lang))
+
+    pdf_context = build_crop_result_context(saved_result, lang)
+    pdf_buffer = build_crop_result_pdf(pdf_context)
+
+    return send_file(
+        pdf_buffer,
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=build_crop_pdf_filename(saved_result.get("prediction_raw")),
+        max_age=0
+    )
 
 
 @app.route('/fertilizer')

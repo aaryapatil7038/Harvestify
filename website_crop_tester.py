@@ -11,7 +11,7 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
-from utils.crop_features import FEATURE_COLUMNS
+from utils.crop_features import INPUT_FEATURE_COLUMNS
 
 
 DEFAULT_SEASON = "Summer"
@@ -245,7 +245,7 @@ def compute_expected_prediction(app_module, form_data: Dict[str, str], weather_i
             form_data["water_source"],
             form_data["water_availability"],
         ]],
-        columns=FEATURE_COLUMNS,
+        columns=INPUT_FEATURE_COLUMNS,
     )
 
     crop_xai_runtime = app_module.get_crop_xai_runtime()

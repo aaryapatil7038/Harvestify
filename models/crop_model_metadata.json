@@ -11,6 +11,26 @@
     "rainfall",
     "season",
     "water_source",
+    "water_availability",
+    "nutrient_total",
+    "np_ratio",
+    "pk_ratio",
+    "temp_humidity_index",
+    "rainfall_log",
+    "ph_distance_neutral",
+    "water_access_score",
+    "season_water_pressure"
+  ],
+  "input_feature_columns": [
+    "N",
+    "P",
+    "K",
+    "temperature",
+    "humidity",
+    "ph",
+    "rainfall",
+    "season",
+    "water_source",
     "water_availability"
   ],
   "feature_display_names": [
@@ -23,7 +43,15 @@
     "Rainfall",
     "Season",
     "Water Source",
-    "Water Availability"
+    "Water Availability",
+    "Combined NPK",
+    "Nitrogen to Phosphorous Ratio",
+    "Phosphorous to Potassium Ratio",
+    "Temperature-Humidity Index",
+    "Log Rainfall",
+    "pH Distance From Neutral",
+    "Water Access Score",
+    "Season-Water Pressure"
   ],
   "target_column": "label",
   "class_names": [
@@ -58,60 +86,101 @@
     "turmeric",
     "wheat"
   ],
-  "selected_model_name": "xgboost_multiclass_v2",
+  "selected_model_name": "xgboost_multiclass_v28",
   "selected_model_type": "XGBClassifier",
   "uses_scaler": true,
   "feature_reference": {
     "N": {
-      "mean": 79.679167,
-      "median": 82.0,
-      "std": 43.517946
+      "mean": 76.980378,
+      "median": 78.0,
+      "std": 38.60408
     },
     "P": {
-      "mean": 43.006111,
-      "median": 42.0,
-      "std": 11.330494
+      "mean": 45.710896,
+      "median": 44.0,
+      "std": 13.19657
     },
     "K": {
-      "mean": 61.542778,
-      "median": 46.0,
-      "std": 41.51953
+      "mean": 59.047104,
+      "median": 45.0,
+      "std": 40.69338
     },
     "temperature": {
-      "mean": 26.382763,
-      "median": 26.61,
-      "std": 4.027539
+      "mean": 25.895978,
+      "median": 25.89,
+      "std": 4.393745
     },
     "humidity": {
-      "mean": 59.106049,
-      "median": 59.65,
-      "std": 13.319882
+      "mean": 60.266325,
+      "median": 62.21,
+      "std": 15.819988
     },
     "ph": {
-      "mean": 6.748434,
-      "median": 6.77,
-      "std": 0.421724
+      "mean": 6.640799,
+      "median": 6.65,
+      "std": 0.505088
     },
     "rainfall": {
-      "mean": 439.738909,
-      "median": 349.76,
-      "std": 353.93158
+      "mean": 445.78484,
+      "median": 236.665,
+      "std": 456.398491
     },
     "season": {
-      "mode": "Kharif"
+      "mode": 0.0
     },
     "water_source": {
-      "mode": "rainfed"
+      "mode": 0.0
     },
     "water_availability": {
-      "mode": "medium"
+      "mode": 1.0
+    },
+    "nutrient_total": {
+      "mean": 181.738379,
+      "median": 175.0,
+      "std": 80.93158
+    },
+    "np_ratio": {
+      "mean": 1.651829,
+      "median": 1.683333,
+      "std": 0.680298
+    },
+    "pk_ratio": {
+      "mean": 0.972737,
+      "median": 0.916667,
+      "std": 0.518051
+    },
+    "temp_humidity_index": {
+      "mean": 15.490533,
+      "median": 15.720361,
+      "std": 4.349304
+    },
+    "rainfall_log": {
+      "mean": 5.597674,
+      "median": 5.470862,
+      "std": 1.027575
+    },
+    "ph_distance_neutral": {
+      "mean": 0.409745,
+      "median": 0.34,
+      "std": 0.32718
+    },
+    "water_access_score": {
+      "mean": 4.000167,
+      "median": 4.0,
+      "std": 1.807375
+    },
+    "season_water_pressure": {
+      "mean": -1.764814,
+      "median": -2.0,
+      "std": 2.108905
     }
   },
-  "rows_per_crop_target": 600,
+  "rows_per_crop_target": 1000,
+  "xgboost_search_rounds": 1,
   "split_summary": {
-    "train_rows": 14400,
-    "test_rows": 3600,
-    "validation_rows_for_tuning": 2160,
+    "train_rows": 23998,
+    "test_rows": 6000,
+    "validation_rows_for_tuning": 3600,
     "train_test_split": "80_20_stratified"
   }
 }

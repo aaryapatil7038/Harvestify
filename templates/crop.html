@@ -515,6 +515,36 @@
         margin-top: 28px;
     }
 
+    .form-anchor {
+        scroll-margin-top: calc(var(--drawer-top-offset) + 18px);
+    }
+
+    .mobile-quick-nav {
+        display: none;
+    }
+
+    .jump-chip,
+    .quick-tools-btn {
+        border: 1px solid rgba(47,123,87,0.12);
+        background: rgba(255,255,255,0.88);
+        color: var(--green-dark);
+        border-radius: 999px;
+        min-height: 42px;
+        padding: 0 14px;
+        font-size: 0.88rem;
+        font-weight: 700;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+    }
+
+    .quick-tools-btn {
+        cursor: pointer;
+    }
+
     .primary-btn,
     .secondary-btn,
     .drawer-tab {
@@ -1007,6 +1037,7 @@
     @media (max-width: 900px) {
         .crop-page {
             padding-left: 0;
+            padding-bottom: 104px;
         }
 
         .hero-card,
@@ -1061,6 +1092,33 @@
             display: inline-flex;
         }
 
+        .mobile-quick-nav {
+            position: sticky;
+            top: calc(var(--drawer-top-offset) + 10px);
+            z-index: 18;
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            padding: 8px 2px 4px;
+            margin: 0 0 16px;
+            scrollbar-width: none;
+        }
+
+        .mobile-quick-nav::-webkit-scrollbar {
+            display: none;
+        }
+
+        .mobile-quick-nav::after {
+            content: "";
+            flex: 0 0 2px;
+        }
+
+        .jump-chip,
+        .quick-tools-btn {
+            flex: 0 0 auto;
+            white-space: nowrap;
+        }
+
         .side-drawer {
             width: min(360px, calc(100vw - 24px));
             max-width: calc(100vw - 24px);
@@ -1096,6 +1154,30 @@
 
         .side-drawer:not(.open) .sidebar-tooltip {
             display: none;
+        }
+
+        body.drawer-open-mobile {
+            overflow: hidden;
+        }
+
+        .action-row {
+            position: sticky;
+            bottom: max(10px, env(safe-area-inset-bottom, 0px) + 6px);
+            z-index: 16;
+            margin-top: 22px;
+            padding: 10px;
+            border-radius: 20px;
+            background: rgba(255, 250, 243, 0.88);
+            border: 1px solid rgba(35, 60, 47, 0.08);
+            backdrop-filter: blur(16px);
+            box-shadow: 0 14px 30px rgba(15, 23, 42, 0.10);
+        }
+
+        .primary-btn {
+            width: 100%;
+            min-width: 0;
+            height: 56px;
+            border-radius: 16px;
         }
     }
 
@@ -1144,7 +1226,7 @@
         .field select {
             height: 48px;
             padding: 0 12px;
-            font-size: 0.92rem;
+            font-size: 16px;
         }
 
         .field label,
@@ -1195,10 +1277,30 @@
         }
 
         .mobile-drawer-toggle {
-            left: 12px;
+            left: auto;
             right: 12px;
-            bottom: max(14px, env(safe-area-inset-bottom, 0px) + 10px);
+            bottom: max(18px, env(safe-area-inset-bottom, 0px) + 14px);
             justify-content: center;
+            min-width: 0;
+            width: 56px;
+            height: 56px;
+            padding: 0;
+            border-radius: 999px;
+            box-shadow: 0 16px 34px rgba(15, 23, 42, 0.18);
+        }
+
+        .mobile-drawer-toggle .drawer-label {
+            display: none;
+        }
+
+        .action-row {
+            bottom: max(84px, env(safe-area-inset-bottom, 0px) + 72px);
+            margin-top: 18px;
+        }
+
+        .save-row,
+        .saved-selector-row {
+            grid-template-columns: 1fr;
         }
     }
 </style>
@@ -1299,6 +1401,13 @@
                     {% endif %}
                 </p>
 
+                <div class="mobile-quick-nav" aria-label="{% if lang == 'mr' %}मोबाइल झटपट नेव्हिगेशन{% else %}Mobile quick navigation{% endif %}">
+                    <a class="jump-chip" href="#inputsSection">{% if lang == 'mr' %}इनपुट{% else %}Inputs{% endif %}</a>
+                    <a class="jump-chip" href="#locationSection">{% if lang == 'mr' %}स्थान{% else %}Location{% endif %}</a>
+                    <a class="jump-chip" href="#saveSection">{% if lang == 'mr' %}सेव्ह{% else %}Save{% endif %}</a>
+                    <button type="button" class="quick-tools-btn" id="quickToolsBtn">{% if lang == 'mr' %}टूल्स{% else %}Tools{% endif %}</button>
+                </div>
+
                 <form action="{{ url_for('crop_prediction') }}" method="POST" id="cropForm" class="form-section">
                     <input type="hidden" name="lang" value="{{ lang }}">
                     <input type="hidden" name="location_method" id="location_method" value="">
@@ -1309,7 +1418,7 @@
                     <input type="hidden" name="weather_humidity" id="weatherHumidityInput">
                     <input type="hidden" name="rainfall" id="rainfallInput">
 
-                    <div class="form-grid">
+                    <div class="form-grid form-anchor" id="inputsSection">
                         <div class="field">
                             <label for="nitrogen">{{ ui.nitrogen }}</label>
                             <input type="number" step="any" id="nitrogen" name="nitrogen" placeholder="{{ ui.nitrogen_placeholder }}" required>
@@ -1365,7 +1474,7 @@
                         </div>
                     </div>
 
-                    <div class="sub-card">
+                    <div class="sub-card form-anchor" id="locationSection">
                         <div class="sub-card-header">
                             <h3>{{ ui.location_method }}</h3>
                             <span>{% if lang == 'mr' %}शेताचे स्थान कसे निवडायचे ते ठरवा{% else %}Select how you want to set the farm location{% endif %}</span>
@@ -1426,7 +1535,7 @@
 
                     
 
-                    <div class="sub-card">
+                    <div class="sub-card form-anchor" id="saveSection">
                         <div class="sub-card-header">
                             <h3>{% if lang == 'mr' %}हे शेत सेव्ह करा{% else %}Save This Farm{% endif %}</h3>
                             <span>{% if lang == 'mr' %}नंतर पटकन वापरण्यासाठी ब्राउझरमध्ये सेव्ह करा{% else %}Store in browser for quick reuse{% endif %}</span>
@@ -1780,6 +1889,7 @@
 
         const savedFarmDropdown = document.getElementById("savedFarmDropdown");
         const loadSelectedFarmBtn = document.getElementById("loadSelectedFarmBtn");
+        const quickToolsBtn = document.getElementById("quickToolsBtn");
 
         const drawerToggle = document.getElementById("drawerToggle");
         const drawerClose = document.getElementById("drawerClose");
@@ -2095,6 +2205,9 @@
             if (drawerToggle) {
                 drawerToggle.setAttribute("aria-expanded", "true");
             }
+            if (document.body && isMobileSidebar()) {
+                document.body.classList.add("drawer-open-mobile");
+            }
         }
 
         function closeDrawer() {
@@ -2105,6 +2218,9 @@
             }
             if (drawerToggle) {
                 drawerToggle.setAttribute("aria-expanded", "false");
+            }
+            if (document.body) {
+                document.body.classList.remove("drawer-open-mobile");
             }
         }
 
@@ -2134,6 +2250,7 @@
                 }
             });
         }
+        if (quickToolsBtn) quickToolsBtn.addEventListener("click", openDrawer);
         if (drawerClose) drawerClose.addEventListener("click", closeDrawer);
         if (drawerOverlay) drawerOverlay.addEventListener("click", closeDrawer);
         document.addEventListener("keydown", function (event) {
@@ -2148,6 +2265,9 @@
             syncDrawerA11yState();
             if (!isMobileSidebar() && drawerOverlay) {
                 drawerOverlay.classList.remove("show");
+            }
+            if (!isMobileSidebar() && document.body) {
+                document.body.classList.remove("drawer-open-mobile");
             }
         });
 

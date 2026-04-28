@@ -13,6 +13,7 @@ from utils.crop_features import (
     REGION_VALUE,
     TARGET_COLUMN,
     ensure_context_columns,
+    normalize_crop_label,
 )
 
 
@@ -31,8 +32,15 @@ DATASET_OUTPUT_COLUMNS = [
     TARGET_COLUMN,
 ]
 
-ROWS_PER_CROP_DEFAULT = 600
+ROWS_PER_CROP_DEFAULT = 1000
 DATASET_RANDOM_SEED = 42
+SOURCE_DATASET_FILENAMES = [
+    "crop_recommendation_1.csv",
+    "crop_recommendation_2.csv",
+    "crop_recommendation_3.csv",
+    "crop_recommendation_original.csv",
+    "crop_recommendation.csv",
+]
 
 CROP_DATASET_PROFILES = {
     "sugarcane": {
@@ -294,6 +302,70 @@ def standardize_existing_dataset(existing_dataset):
     return dataset
 
 
+def standardize_source_dataset(source_dataset):
+    dataset = source_dataset.copy()
+    rename_map = {}
+    for column in dataset.columns:
+        normalized = str(column).strip()
+        if normalized == "temprature":
+            rename_map[column] = "temperature"
+        elif normalized == "crop":
+            rename_map[column] = TARGET_COLUMN
+        elif normalized == "crop_name":
+            rename_map[column] = TARGET_COLUMN
+    if rename_map:
+        dataset = dataset.rename(columns=rename_map)
+
+    if TARGET_COLUMN not in dataset.columns:
+        return pd.DataFrame(columns=DATASET_OUTPUT_COLUMNS)
+
+    dataset[TARGET_COLUMN] = dataset[TARGET_COLUMN].apply(normalize_crop_label)
+    dataset = dataset[dataset[TARGET_COLUMN].isin(CANONICAL_CROP_LABELS)].copy()
+    if dataset.empty:
+        return pd.DataFrame(columns=DATASET_OUTPUT_COLUMNS)
+
+    for numeric_column in ["N", "P", "K", "temperature", "humidity", "ph", "rainfall"]:
+        if numeric_column not in dataset.columns:
+            dataset[numeric_column] = pd.NA
+
+    dataset = ensure_context_columns(dataset)
+    dataset = dataset[DATASET_OUTPUT_COLUMNS].copy()
+
+    for column in ["N", "P", "K"]:
+        dataset[column] = pd.to_numeric(dataset[column], errors="coerce").round().astype("Int64")
+
+    for column in ["temperature", "humidity", "ph", "rainfall"]:
+        dataset[column] = pd.to_numeric(dataset[column], errors="coerce").round(2)
+
+    dataset = dataset.dropna().drop_duplicates().reset_index(drop=True)
+    return dataset
+
+
+def collect_source_datasets(source_dataset_paths):
+    frames = []
+    used_paths = []
+
+    for source_path in source_dataset_paths:
+        candidate_path = Path(source_path)
+        if not candidate_path.exists():
+            continue
+
+        standardized = standardize_source_dataset(pd.read_csv(candidate_path))
+        if standardized.empty:
+            continue
+
+        standardized["__source_path"] = str(candidate_path)
+        frames.append(standardized)
+        used_paths.append(str(candidate_path))
+
+    if not frames:
+        return pd.DataFrame(columns=DATASET_OUTPUT_COLUMNS), used_paths
+
+    merged = pd.concat(frames, ignore_index=True)
+    merged = merged.drop(columns="__source_path", errors="ignore").drop_duplicates().reset_index(drop=True)
+    return merged[DATASET_OUTPUT_COLUMNS], used_paths
+
+
 def rebalance_existing_crop_rows(existing_dataset, rows_per_crop, seed):
     balanced_frames = []
     for crop_name in EXISTING_MAHARASHTRA_CROPS:
@@ -372,6 +444,43 @@ def merge_existing_and_new_dataset(existing_dataset, rows_per_crop=ROWS_PER_CROP
     return merged_dataset
 
 
+def merge_sources_and_generate_missing_rows(
+    source_dataset,
+    rows_per_crop=ROWS_PER_CROP_DEFAULT,
+    seed=DATASET_RANDOM_SEED,
+):
+    standardized_existing = standardize_existing_dataset(source_dataset)
+    balanced_existing = rebalance_existing_crop_rows(standardized_existing, rows_per_crop, seed)
+
+    generated_frames = []
+    existing_counts = (
+        balanced_existing[TARGET_COLUMN].value_counts().to_dict() if not balanced_existing.empty else {}
+    )
+    for index, crop_name in enumerate(CANONICAL_CROP_LABELS):
+        current_count = int(existing_counts.get(crop_name, 0))
+        if current_count >= rows_per_crop:
+            continue
+
+        deficit = rows_per_crop - current_count
+        generated_frames.append(
+            generate_crop_subset(
+                [crop_name],
+                rows_per_crop=deficit,
+                seed=seed + 101 + index,
+            )
+        )
+
+    merged_frames = [balanced_existing] + generated_frames
+    merged_frames = [frame for frame in merged_frames if frame is not None and not frame.empty]
+    if not merged_frames:
+        return pd.DataFrame(columns=DATASET_OUTPUT_COLUMNS)
+
+    merged_dataset = pd.concat(merged_frames, ignore_index=True)
+    merged_dataset = merged_dataset[DATASET_OUTPUT_COLUMNS].drop_duplicates().dropna().reset_index(drop=True)
+    merged_dataset = merged_dataset.sort_values([TARGET_COLUMN, "season"]).reset_index(drop=True)
+    return merged_dataset
+
+
 def generate_balanced_maharashtra_dataset(rows_per_crop=ROWS_PER_CROP_DEFAULT, seed=DATASET_RANDOM_SEED):
     return generate_crop_subset(CANONICAL_CROP_LABELS, rows_per_crop=rows_per_crop, seed=seed)
 
@@ -396,6 +505,7 @@ def save_balanced_maharashtra_dataset(
     rows_per_crop=ROWS_PER_CROP_DEFAULT,
     seed=DATASET_RANDOM_SEED,
     existing_dataset_path=None,
+    source_dataset_paths=None,
 ):
     output_path = Path(output_path)
     if existing_dataset_path is None:
@@ -403,7 +513,19 @@ def save_balanced_maharashtra_dataset(
     else:
         existing_dataset_path = Path(existing_dataset_path)
 
-    if existing_dataset_path is not None and Path(existing_dataset_path).exists():
+    if source_dataset_paths is None:
+        data_dir = output_path.parent
+        source_dataset_paths = [data_dir / filename for filename in SOURCE_DATASET_FILENAMES]
+
+    source_dataset, used_source_paths = collect_source_datasets(source_dataset_paths)
+
+    if not source_dataset.empty:
+        dataset = merge_sources_and_generate_missing_rows(
+            source_dataset,
+            rows_per_crop=rows_per_crop,
+            seed=seed,
+        )
+    elif existing_dataset_path is not None and Path(existing_dataset_path).exists():
         existing_dataset = pd.read_csv(existing_dataset_path)
         dataset = merge_existing_and_new_dataset(
             existing_dataset,
@@ -415,4 +537,7 @@ def save_balanced_maharashtra_dataset(
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     dataset.to_csv(output_path, index=False)
-    return dataset, validate_generated_dataset(dataset)
+    validation = validate_generated_dataset(dataset)
+    validation["source_dataset_paths"] = used_source_paths
+    validation["rows_per_crop_target"] = int(rows_per_crop)
+    return dataset, validation

@@ -1,11 +1,24 @@
 from collections import OrderedDict
+import math
 
 import pandas as pd
 
 
-NUMERIC_FEATURE_COLUMNS = ["N", "P", "K", "temperature", "humidity", "ph", "rainfall"]
+RAW_NUMERIC_FEATURE_COLUMNS = ["N", "P", "K", "temperature", "humidity", "ph", "rainfall"]
 CATEGORICAL_FEATURE_COLUMNS = ["season", "water_source", "water_availability"]
-FEATURE_COLUMNS = NUMERIC_FEATURE_COLUMNS + CATEGORICAL_FEATURE_COLUMNS
+DERIVED_NUMERIC_FEATURE_COLUMNS = [
+    "nutrient_total",
+    "np_ratio",
+    "pk_ratio",
+    "temp_humidity_index",
+    "rainfall_log",
+    "ph_distance_neutral",
+    "water_access_score",
+    "season_water_pressure",
+]
+INPUT_FEATURE_COLUMNS = RAW_NUMERIC_FEATURE_COLUMNS + CATEGORICAL_FEATURE_COLUMNS
+FEATURE_COLUMNS = RAW_NUMERIC_FEATURE_COLUMNS + CATEGORICAL_FEATURE_COLUMNS + DERIVED_NUMERIC_FEATURE_COLUMNS
+NUMERIC_FEATURE_COLUMNS = RAW_NUMERIC_FEATURE_COLUMNS + DERIVED_NUMERIC_FEATURE_COLUMNS
 FEATURE_DISPLAY_NAMES = [
     "Nitrogen",
     "Phosphorous",
@@ -17,6 +30,14 @@ FEATURE_DISPLAY_NAMES = [
     "Season",
     "Water Source",
     "Water Availability",
+    "Combined NPK",
+    "Nitrogen to Phosphorous Ratio",
+    "Phosphorous to Potassium Ratio",
+    "Temperature-Humidity Index",
+    "Log Rainfall",
+    "pH Distance From Neutral",
+    "Water Access Score",
+    "Season-Water Pressure",
 ]
 
 TARGET_COLUMN = "label"
@@ -32,6 +53,9 @@ WATER_SOURCE_ENCODING = OrderedDict((value, index) for index, value in enumerate
 WATER_AVAILABILITY_ENCODING = OrderedDict(
     (value, index) for index, value in enumerate(WATER_AVAILABILITY_OPTIONS)
 )
+SEASON_DEMAND_SCORE = OrderedDict((value, score) for value, score in [("Kharif", 3.0), ("Summer", 2.0), ("Rabi", 1.0)])
+WATER_SOURCE_SCORE = OrderedDict((value, score) for value, score in [("rainfed", 1.0), ("borewell", 2.0), ("canal", 3.0), ("drip", 4.0)])
+WATER_AVAILABILITY_SCORE = OrderedDict((value, score) for value, score in [("low", 1.0), ("medium", 2.0), ("high", 3.0)])
 
 EXISTING_MAHARASHTRA_CROPS = [
     "sugarcane",
@@ -402,10 +426,61 @@ def ensure_irrigation_columns(dataset):
     return ensure_context_columns(dataset)
 
 
+def decode_categorical_feature_value(feature_name, feature_value):
+    try:
+        numeric_value = int(round(float(feature_value)))
+    except Exception:
+        return str(feature_value)
+
+    if feature_name == "season":
+        return SEASON_OPTIONS[numeric_value] if 0 <= numeric_value < len(SEASON_OPTIONS) else str(feature_value)
+    if feature_name == "water_source":
+        return (
+            WATER_SOURCE_OPTIONS[numeric_value]
+            if 0 <= numeric_value < len(WATER_SOURCE_OPTIONS)
+            else str(feature_value)
+        )
+    if feature_name == "water_availability":
+        return (
+            WATER_AVAILABILITY_OPTIONS[numeric_value]
+            if 0 <= numeric_value < len(WATER_AVAILABILITY_OPTIONS)
+            else str(feature_value)
+        )
+    return str(feature_value)
+
+
+def append_derived_features(encoded_df):
+    enriched_df = encoded_df.copy()
+
+    enriched_df["nutrient_total"] = (
+        enriched_df["N"] + enriched_df["P"] + enriched_df["K"]
+    ).astype(float)
+    enriched_df["np_ratio"] = (enriched_df["N"] / (enriched_df["P"] + 1.0)).astype(float)
+    enriched_df["pk_ratio"] = (enriched_df["P"] / (enriched_df["K"] + 1.0)).astype(float)
+    enriched_df["temp_humidity_index"] = (
+        enriched_df["temperature"] * (enriched_df["humidity"] / 100.0)
+    ).astype(float)
+    enriched_df["rainfall_log"] = enriched_df["rainfall"].apply(lambda value: round(math.log1p(float(value)), 6))
+    enriched_df["ph_distance_neutral"] = (enriched_df["ph"] - 6.5).abs().astype(float)
+    enriched_df["water_access_score"] = (
+        enriched_df["water_source"].map(lambda code: WATER_SOURCE_SCORE[decode_categorical_feature_value("water_source", code)])
+        + enriched_df["water_availability"].map(
+            lambda code: WATER_AVAILABILITY_SCORE[decode_categorical_feature_value("water_availability", code)]
+        )
+    ).astype(float)
+    enriched_df["season_water_pressure"] = (
+        enriched_df["season"].map(lambda code: SEASON_DEMAND_SCORE[decode_categorical_feature_value("season", code)])
+        - enriched_df["water_access_score"]
+    ).astype(float)
+
+    return enriched_df
+
+
 def encode_feature_frame(dataframe):
     feature_df = dataframe.copy()
+    feature_df = feature_df[INPUT_FEATURE_COLUMNS].copy()
 
-    for column in NUMERIC_FEATURE_COLUMNS:
+    for column in RAW_NUMERIC_FEATURE_COLUMNS:
         feature_df[column] = pd.to_numeric(feature_df[column], errors="raise")
 
     feature_df["season"] = feature_df["season"].apply(normalize_season)
@@ -427,26 +502,28 @@ def encode_feature_frame(dataframe):
             "Unsupported water availability values: {0}".format(", ".join(invalid_levels))
         )
 
-    encoded_df = feature_df[NUMERIC_FEATURE_COLUMNS].copy()
+    encoded_df = feature_df[RAW_NUMERIC_FEATURE_COLUMNS].copy()
     encoded_df["season"] = feature_df["season"].map(SEASON_ENCODING).astype(float)
     encoded_df["water_source"] = feature_df["water_source"].map(WATER_SOURCE_ENCODING).astype(float)
     encoded_df["water_availability"] = feature_df["water_availability"].map(
         WATER_AVAILABILITY_ENCODING
     ).astype(float)
+    encoded_df = append_derived_features(encoded_df)
     return encoded_df[FEATURE_COLUMNS]
 
 
 def build_feature_reference(feature_df):
     reference = OrderedDict()
 
-    for column in NUMERIC_FEATURE_COLUMNS:
+    for column in FEATURE_COLUMNS:
+        if column in CATEGORICAL_FEATURE_COLUMNS:
+            reference[column] = {"mode": round(float(feature_df[column].mode().iloc[0]), 6)}
+            continue
+
         reference[column] = {
             "mean": round(float(feature_df[column].mean()), 6),
             "median": round(float(feature_df[column].median()), 6),
             "std": round(float(feature_df[column].std(ddof=0)), 6)
         }
-
-    for column in CATEGORICAL_FEATURE_COLUMNS:
-        reference[column] = {"mode": str(feature_df[column].mode().iloc[0])}
 
     return reference

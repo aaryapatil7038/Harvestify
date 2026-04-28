@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pandas as pd
 
-from utils.crop_features import FEATURE_COLUMNS
+from utils.crop_features import INPUT_FEATURE_COLUMNS
 
 
 class CropArtifactLoadingTests(unittest.TestCase):
@@ -15,7 +15,7 @@ class CropArtifactLoadingTests(unittest.TestCase):
 
         sample_df = pd.DataFrame(
             [[86, 59, 42, 27.59, 77.34, 5.70, 205.81, "Kharif", "canal", "high"]],
-            columns=FEATURE_COLUMNS
+            columns=INPUT_FEATURE_COLUMNS
         )
 
         bundle = explain_crop_prediction_bundle(sample_df)
@@ -34,7 +34,7 @@ class CropArtifactLoadingTests(unittest.TestCase):
 
         sample_df = pd.DataFrame(
             [[86, 59, 42, 27.59, 77.34, 5.70, 205.81, "Kharif", "canal", "high"]],
-            columns=FEATURE_COLUMNS
+            columns=INPUT_FEATURE_COLUMNS
         )
 
         merged_df, shap_df, explanations, prediction, top3_predictions = explain_crop_prediction(sample_df)
@@ -45,7 +45,7 @@ class CropArtifactLoadingTests(unittest.TestCase):
             ["Feature", "Impact Value", "Observed Value", "Effect", "Human Explanation"]
         )
         self.assertTrue(prediction)
-        self.assertEqual(len(explanations), len(FEATURE_COLUMNS))
+        self.assertEqual(len(explanations), len(shap_df))
         self.assertEqual(len(top3_predictions), 3)
         self.assertEqual(top3_predictions[0]["crop"], prediction)
 
@@ -99,7 +99,7 @@ class CropArtifactLoadingTests(unittest.TestCase):
 
         predictions = []
         for sample in representative_samples:
-            sample_df = pd.DataFrame([sample], columns=FEATURE_COLUMNS)
+            sample_df = pd.DataFrame([sample], columns=INPUT_FEATURE_COLUMNS)
             _, _, _, prediction, top3_predictions = explain_crop_prediction(sample_df)
             predictions.append(prediction)
             self.assertEqual(top3_predictions[0]["crop"], prediction)
@@ -371,6 +371,92 @@ class CropPredictRouteTests(unittest.TestCase):
         self.assertNotIn("LIME Local Explanation", body)
         self.assertNotIn("SHAP Feature Impact for", body)
         self.assertNotIn("LIME Local Feature Weights for", body)
+
+    def test_crop_result_pdf_download_returns_attachment(self):
+        client = self.flask_app.test_client()
+
+        with client.session_transaction() as session_data:
+            session_data["last_crop_result"] = {
+                "prediction_raw": "rice",
+                "top3_predictions": [{"crop": "rice", "confidence": 81.0}],
+                "explanation": [
+                    {"Feature": "Rainfall", "Impact Value": 0.61, "Effect": "Positive (Helps crop)"},
+                ],
+                "explanations": [],
+                "lime_explanation": [
+                    {"Feature": "Rainfall", "Local Weight": 0.32, "Effect": "Positive (Helps crop)"},
+                ],
+                "lime_explanations": [],
+                "land_area": 2,
+                "land_unit": "acre",
+                "estimated_yield": 12.5,
+                "estimated_profit": "â‚¹10000",
+                "yield_profit_summary_en": "Yield summary",
+                "yield_profit_summary_mr": "Yield summary",
+                "live_modal_price": "N/A",
+                "market_name": "-",
+                "price_date": "-",
+                "weather_city": "Pune",
+                "weather_temperature": 27.5,
+                "weather_humidity": 78.0,
+                "weather_rainfall": 210.0,
+                "weather_latitude": 18.52,
+                "weather_longitude": 73.85,
+                "current_season": "Kharif",
+                "prediction_count": 1,
+                "show_feedback_prompt": False,
+                "feedback_submitted": False,
+            }
+
+        with patch.object(self.app_module, "generate_overall_summary", return_value="summary"), \
+             patch.object(self.app_module, "get_crop_sowing_guidance", return_value=None):
+            response = client.get("/crop-result.pdf?lang=en")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.mimetype, "application/pdf")
+        self.assertIn("attachment;", response.headers["Content-Disposition"])
+        self.assertIn("rice-prediction-report.pdf", response.headers["Content-Disposition"])
+        self.assertTrue(response.data.startswith(b"%PDF"))
+
+    def test_crop_result_context_uses_marathi_pdf_labels(self):
+        saved_result = {
+            "prediction_raw": "rice",
+            "top3_predictions": [{"crop": "rice", "confidence": 81.0}],
+            "explanation": [{"Feature": "Rainfall", "Impact Value": 0.61, "Effect": "Positive (Helps crop)"}],
+            "explanations": [],
+            "lime_explanation": [{"Feature": "Rainfall", "Local Weight": 0.32, "Effect": "Positive (Helps crop)"}],
+            "lime_explanations": [],
+            "land_area": 2,
+            "land_unit": "acre",
+            "estimated_yield": 12.5,
+            "estimated_profit": "â‚¹10000",
+            "yield_profit_summary_en": "Yield summary",
+            "yield_profit_summary_mr": "Yield summary",
+            "live_modal_price": "N/A",
+            "market_name": "-",
+            "price_date": "-",
+            "weather_city": "Pune",
+            "weather_temperature": 27.5,
+            "weather_humidity": 78.0,
+            "weather_rainfall": 210.0,
+            "weather_latitude": 18.52,
+            "weather_longitude": 73.85,
+            "current_season": "Kharif",
+            "prediction_count": 1,
+            "show_feedback_prompt": False,
+            "feedback_submitted": False,
+        }
+
+        with self.flask_app.test_request_context("/crop-result?lang=mr"), \
+             patch.object(self.app_module, "generate_overall_summary", return_value="summary"), \
+             patch.object(self.app_module, "get_crop_sowing_guidance", return_value=None):
+            context = self.app_module.build_crop_result_context(saved_result, "mr")
+
+        self.assertEqual(context["title"], "पीक निकाल")
+        self.assertEqual(context["land_unit_display"], "एकर")
+        self.assertEqual(context["ui"]["yield_profit_section"], "उत्पादन आणि नफा आढावा")
+        self.assertEqual(context["ui"]["weather_heading"], "हवामान")
+        self.assertEqual(context["ui"]["pdf_generated_on"], "PDF तयार केलेली वेळ")
 
     def test_crop_recommend_page_has_location_method_selector_without_custom_popup(self):
         with patch.object(self.app_module, "start_crop_runtime_warmup") as warmup_mock:

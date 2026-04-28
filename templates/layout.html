@@ -36,6 +36,61 @@
 	<link href="{{ url_for('static', filename='css/font-awesome.min.css') }}" rel="stylesheet">
 	<link href="{{ url_for('static', filename='css/custom-ui.css', v='20260419-scale-down-pass-2') }}" rel="stylesheet" type="text/css" />
 	{% block extra_head %}{% endblock %}
+	<style>
+		@media (max-width: 991.98px) {
+			.clean-navbar {
+				position: sticky;
+				top: 0;
+				z-index: 1200;
+				backdrop-filter: blur(18px);
+			}
+
+			.clean-navbar .container {
+				align-items: center;
+			}
+
+			.navbar-collapse {
+				margin-top: 12px;
+				padding: 14px;
+				border-radius: 22px;
+				background: rgba(255, 250, 243, 0.96);
+				border: 1px solid rgba(35, 60, 47, 0.08);
+				box-shadow: 0 18px 38px rgba(25, 42, 32, 0.12);
+			}
+
+			.navbar-nav {
+				gap: 6px;
+			}
+
+			.navbar-nav .nav-item,
+			.navbar-tools,
+			.lang-toggle-navbar {
+				width: 100%;
+			}
+
+			.clean-nav-link {
+				display: flex;
+				align-items: center;
+				min-height: 50px;
+				padding: 12px 14px;
+				border-radius: 16px;
+			}
+
+			.navbar-tools {
+				display: grid;
+				gap: 12px;
+				margin-top: 12px;
+			}
+
+			.lang-toggle {
+				width: 100%;
+			}
+
+			.lang-btn {
+				flex: 1 1 0;
+			}
+		}
+	</style>
 
 	<script type="text/JavaScript" src="{{ url_for('static', filename='scripts/cities.js') }}"></script>
 

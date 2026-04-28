@@ -1,9 +1,9 @@
 {
   "dataset_path": "C:\\Users\\Aarya\\Downloads\\Harvestify\\XAI_Crop_Recommendation_System\\Data\\crop_recommendation_merged_maharashtra.csv",
   "region": "Maharashtra",
-  "raw_row_count": 18000,
-  "cleaned_row_count": 18000,
-  "rows_removed": 0,
+  "raw_row_count": 30000,
+  "cleaned_row_count": 29998,
+  "rows_removed": 2,
   "duplicate_rows_removed": 0,
   "missing_values_by_column_before_fill": {
     "N": 0,
@@ -21,140 +21,146 @@
   },
   "class_balance": {
     "num_classes": 30,
-    "minority_class_count": 600,
-    "majority_class_count": 600,
-    "imbalance_ratio": 1.0,
+    "minority_class_count": 998,
+    "majority_class_count": 1000,
+    "imbalance_ratio": 1.002004,
     "is_balanced_within_5_percent": true
   },
   "feature_ranges": {
     "N": {
-      "min": 15.0,
-      "max": 240.0,
-      "mean": 79.6455,
-      "std": 43.488602
+      "min": 3.0,
+      "max": 214.01,
+      "mean": 76.991773,
+      "std": 38.620937
     },
     "P": {
       "min": 15.0,
-      "max": 80.0,
-      "mean": 43.016444,
-      "std": 11.334326
+      "max": 88.0,
+      "mean": 45.695916,
+      "std": 13.193375
     },
     "K": {
-      "min": 16.0,
-      "max": 260.0,
-      "mean": 61.5305,
-      "std": 41.582433
+      "min": 15.0,
+      "max": 253.01,
+      "mean": 58.974182,
+      "std": 40.706309
     },
     "temperature": {
-      "min": 15.24,
-      "max": 38.0,
-      "mean": 26.380582,
-      "std": 4.024856
+      "min": 12.7693,
+      "max": 39.7306,
+      "mean": 25.877926,
+      "std": 4.385944
     },
     "humidity": {
-      "min": 25.0,
-      "max": 92.0,
-      "mean": 59.090192,
-      "std": 13.291029
+      "min": 12.5775,
+      "max": 90.5208,
+      "mean": 60.276733,
+      "std": 15.784702
     },
     "ph": {
-      "min": 5.0,
-      "max": 8.5,
-      "mean": 6.748529,
-      "std": 0.422825
+      "min": 4.6,
+      "max": 8.76,
+      "mean": 6.641885,
+      "std": 0.505706
     },
     "rainfall": {
-      "min": 10.0,
-      "max": 1600.0,
-      "mean": 439.367647,
-      "std": 353.963963
+      "min": 22.4647,
+      "max": 3016.09,
+      "mean": 445.21956,
+      "std": 457.570783
     }
   },
   "context_distribution": {
     "region": {
-      "Maharashtra": 18000
+      "Maharashtra": 29998
     },
     "season": {
-      "Kharif": 8100,
-      "Rabi": 5700,
-      "Summer": 4200
+      "Kharif": 15754,
+      "Rabi": 8727,
+      "Summer": 5517
     },
     "water_source": {
-      "borewell": 3600,
-      "canal": 1800,
-      "drip": 4800,
-      "rainfed": 7800
+      "borewell": 6000,
+      "canal": 3000,
+      "drip": 8000,
+      "rainfed": 12998
     },
     "water_availability": {
-      "high": 3000,
-      "low": 6600,
-      "medium": 8400
+      "high": 5000,
+      "low": 10998,
+      "medium": 14000
     }
   },
   "outlier_summary_iqr": {
     "N": {
-      "q1": 38.0,
-      "q3": 104.0,
-      "iqr": 66.0,
-      "lower_bound": -61.0,
-      "upper_bound": 203.0,
-      "outlier_count": 182,
-      "outlier_percent": 1.0111
+      "q1": 43.0,
+      "q3": 101.75,
+      "iqr": 58.75,
+      "lower_bound": -45.125,
+      "upper_bound": 189.875,
+      "outlier_count": 363,
+      "outlier_percent": 1.2101
     },
     "P": {
-      "q1": 34.0,
-      "q3": 51.0,
-      "iqr": 17.0,
-      "lower_bound": 8.5,
-      "upper_bound": 76.5,
-      "outlier_count": 13,
-      "outlier_percent": 0.0722
+      "q1": 36.0,
+      "q3": 55.0,
+      "iqr": 19.0,
+      "lower_bound": 7.5,
+      "upper_bound": 83.5,
+      "outlier_count": 115,
+      "outlier_percent": 0.3834
     },
     "K": {
-      "q1": 33.0,
-      "q3": 81.0,
-      "iqr": 48.0,
-      "lower_bound": -39.0,
-      "upper_bound": 153.0,
-      "outlier_count": 600,
-      "outlier_percent": 3.3333
+      "q1": 32.0,
+      "q3": 77.0,
+      "iqr": 45.0,
+      "lower_bound": -35.5,
+      "upper_bound": 144.5,
+      "outlier_count": 1000,
+      "outlier_percent": 3.3336
     },
     "temperature": {
-      "q1": 23.35,
-      "q3": 29.12,
-      "iqr": 5.77,
-      "lower_bound": 14.695,
-      "upper_bound": 37.775,
-      "outlier_count": 1,
-      "outlier_percent": 0.0056
+      "q1": 22.61,
+      "q3": 28.84,
+      "iqr": 6.23,
+      "lower_bound": 13.265,
+      "upper_bound": 38.185,
+      "outlier_count": 67,
+      "outlier_percent": 0.2233
     },
     "humidity": {
-      "q1": 48.76,
-      "q3": 68.84,
-      "iqr": 20.08,
-      "lower_bound": 18.64,
-      "upper_bound": 98.96,
-      "outlier_count": 0,
-      "outlier_percent": 0.0
+      "q1": 49.2397,
+      "q3": 72.0,
+      "iqr": 22.7603,
+      "lower_bound": 15.09925,
+      "upper_bound": 106.14045,
+      "outlier_count": 134,
+      "outlier_percent": 0.4467
     },
     "ph": {
-      "q1": 6.5,
-      "q3": 7.02,
-      "iqr": 0.52,
-      "lower_bound": 5.72,
-      "upper_bound": 7.8,
-      "outlier_count": 389,
-      "outlier_percent": 2.1611
+      "q1": 6.33,
+      "q3": 6.96,
+      "iqr": 0.63,
+      "lower_bound": 5.385,
+      "upper_bound": 7.905,
+      "outlier_count": 504,
+      "outlier_percent": 1.6801
     },
     "rainfall": {
-      "q1": 130.0075,
-      "q3": 675.8875,
-      "iqr": 545.88,
-      "lower_bound": -688.8125,
-      "upper_bound": 1494.7075,
-      "outlier_count": 14,
-      "outlier_percent": 0.0778
+      "q1": 107.68,
+      "q3": 629.215,
+      "iqr": 521.535,
+      "lower_bound": -674.6225,
+      "upper_bound": 1411.5175,
+      "outlier_count": 1255,
+      "outlier_percent": 4.1836
     }
+  },
+  "winsorization": {
+    "enabled": true,
+    "lower_quantile": 0.01,
+    "upper_quantile": 0.99,
+    "applied_per_crop": true
   },
   "new_crops_added": [
     "banana",

@@ -160,6 +160,31 @@
     line-height: 1.6;
   }
 
+  .result-anchor {
+    scroll-margin-top: 112px;
+  }
+
+  .result-quick-nav {
+    display: none;
+  }
+
+  .result-jump-chip {
+    border: 1px solid rgba(47, 123, 87, 0.12);
+    background: rgba(255, 255, 255, 0.92);
+    color: var(--primary);
+    border-radius: 999px;
+    min-height: 40px;
+    padding: 0 14px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+  }
+
   .result-hero-shell {
     display: flex;
     align-items: flex-start;
@@ -175,6 +200,7 @@
   .result-download-wrap {
     position: relative;
     flex-shrink: 0;
+    z-index: 1;
   }
 
   .result-download-btn {
@@ -247,6 +273,7 @@
   @media (max-width: 768px) {
     .result-hero-shell {
       align-items: center;
+      flex-direction: column;
     }
 
     .metric-grid {
@@ -260,6 +287,85 @@
     .top3-head {
       flex-direction: column;
       align-items: flex-start;
+    }
+
+    .result-download-wrap {
+      width: 100%;
+    }
+
+    .result-download-btn {
+      width: 100%;
+      height: 50px;
+      border-radius: 14px;
+    }
+
+    .result-download-tooltip {
+      display: none;
+    }
+
+    .result-quick-nav {
+      position: sticky;
+      top: 92px;
+      z-index: 12;
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      padding: 6px 2px 4px;
+      margin: 0 0 16px;
+      scrollbar-width: none;
+    }
+
+    .result-quick-nav::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .clean-table,
+    .clean-table tbody,
+    .clean-table tr,
+    .clean-table td {
+      display: block;
+      width: 100%;
+    }
+
+    .clean-table thead {
+      display: none;
+    }
+
+    .clean-table {
+      border: none;
+      background: transparent;
+    }
+
+    .clean-table tr {
+      margin-bottom: 12px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: #ffffff;
+      overflow: hidden;
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+    }
+
+    .clean-table td {
+      border-bottom: 1px solid #ece7de;
+      padding: 10px 14px;
+      text-align: left;
+    }
+
+    .clean-table td:last-child {
+      border-bottom: none;
+    }
+
+    .clean-table td::before {
+      content: attr(data-label);
+      display: block;
+      margin-bottom: 4px;
+      color: var(--muted);
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
     }
   }
 
@@ -344,10 +450,10 @@
       </div>
 
       <div class="result-download-wrap" data-html2canvas-ignore="true">
-        <button
-          type="button"
+        <a
           class="result-download-btn"
           id="downloadResultBtn"
+          href="{{ url_for('crop_result_pdf', lang=lang) }}"
           aria-label="{% if lang == 'mr' %}डाउनलोड{% else %}Download{% endif %}"
         >
           <svg class="result-download-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -355,16 +461,24 @@
             <path d="m7 10 5 5 5-5"></path>
             <path d="M5 21h14"></path>
           </svg>
-        </button>
+        </a>
         <span class="result-download-tooltip">{% if lang == 'mr' %}डाउनलोड{% else %}Download{% endif %}</span>
       </div>
     </div>
   </div>
 
+  <div class="result-quick-nav" aria-label="{% if lang == 'mr' %}निकाल झटपट नेव्हिगेशन{% else %}Result quick navigation{% endif %}">
+    <a class="result-jump-chip" href="#overviewSection">{% if lang == 'mr' %}निकाल{% else %}Result{% endif %}</a>
+    <a class="result-jump-chip" href="#weatherSection">{% if lang == 'mr' %}हवामान{% else %}Weather{% endif %}</a>
+    <a class="result-jump-chip" href="#yieldSection">{% if lang == 'mr' %}नफा{% else %}Profit{% endif %}</a>
+    <a class="result-jump-chip" href="#top3Section">{% if lang == 'mr' %}Top 3{% else %}Top 3{% endif %}</a>
+    <a class="result-jump-chip" href="#xaiSection">{% if lang == 'mr' %}स्पष्टीकरण{% else %}Explain{% endif %}</a>
+  </div>
+
   <div class="result-grid">
 
     <!-- MAIN PREDICTION -->
-    <div class="section-card text-center">
+    <div class="section-card text-center result-anchor" id="overviewSection">
       <p class="main-result">🌾 {{ prediction }}</p>
     </div>
 
@@ -422,7 +536,7 @@
 
     <!-- WEATHER USED -->
     {% if weather_city is defined or weather_temperature is defined or weather_humidity is defined or weather_rainfall is defined %}
-    <div class="section-card">
+    <div class="section-card result-anchor" id="weatherSection">
       <div class="section-title">
         {% if lang == 'mr' %}
           भविष्यवाणीसाठी वापरलेली हवामान मूल्ये
@@ -499,7 +613,7 @@
 
     <!-- YIELD / PROFIT -->
     {% if estimated_yield is defined and estimated_profit is defined %}
-    <div class="section-card">
+    <div class="section-card result-anchor" id="yieldSection">
       <div class="section-title">{% if lang == 'mr' %}उत्पादन आणि नफा आढावा{% else %}Yield and Profit Overview{% endif %}</div>
 
       <div class="metric-grid">
@@ -540,7 +654,7 @@
 
     <!-- TOP 3 -->
     {% if top3_predictions %}
-    <div class="section-card">
+    <div class="section-card result-anchor" id="top3Section">
       <div class="section-title">{{ ui.top3 }}</div>
 
       {% for item in top3_predictions %}
@@ -582,7 +696,7 @@
     {% endif %}
 
     {% if xai_consensus_summary or (combined_xai_table is not none and not combined_xai_table.empty) %}
-    <div class="section-card">
+    <div class="section-card result-anchor" id="xaiSection">
       <div class="section-title">{{ ui.combined_xai_title }}</div>
 
       {% if xai_consensus_summary %}
@@ -594,21 +708,24 @@
       {% if combined_xai_table is not none and not combined_xai_table.empty %}
       <div class="impact-table-wrap {% if xai_consensus_summary %}mt-3{% endif %}">
         <table class="clean-table">
-          <tr>
-            <th>{{ ui.feature }}</th>
-            <th>{{ ui.shap_impact }}</th>
-            <th>{{ ui.lime_weight }}</th>
-            <th>{{ ui.combined_effect }}</th>
-          </tr>
-
-          {% for row in combined_xai_table.itertuples() %}
-          <tr>
-            <td>{{ row.Feature }}</td>
-            <td>{{ row[2] if row[2] is not none else "N/A" }}</td>
-            <td>{{ row[3] if row[3] is not none else "N/A" }}</td>
-            <td>{{ row.Effect }}</td>
-          </tr>
-          {% endfor %}
+          <thead>
+            <tr>
+              <th>{{ ui.feature }}</th>
+              <th>{{ ui.shap_impact }}</th>
+              <th>{{ ui.lime_weight }}</th>
+              <th>{{ ui.combined_effect }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in combined_xai_table.itertuples() %}
+            <tr>
+              <td data-label="{{ ui.feature }}">{{ row.Feature }}</td>
+              <td data-label="{{ ui.shap_impact }}">{{ row[2] if row[2] is not none else "N/A" }}</td>
+              <td data-label="{{ ui.lime_weight }}">{{ row[3] if row[3] is not none else "N/A" }}</td>
+              <td data-label="{{ ui.combined_effect }}">{{ row.Effect }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
         </table>
       </div>
       {% endif %}
@@ -719,9 +836,10 @@
     }
 
     if (downloadButton) {
-      downloadButton.addEventListener("click", async function () {
+      downloadButton.addEventListener("click", async function (event) {
+        event.preventDefault();
         if (!pageWrap || !window.html2canvas || !window.jspdf || !window.jspdf.jsPDF) {
-          window.print();
+          window.location.href = downloadButton.getAttribute("href") || {{ url_for('crop_result_pdf', lang=lang)|tojson }};
           return;
         }
 
@@ -757,7 +875,7 @@
 
           pdf.save("crop-prediction-report.pdf");
         } catch (error) {
-          window.print();
+          window.location.href = downloadButton.getAttribute("href") || {{ url_for('crop_result_pdf', lang=lang)|tojson }};
         } finally {
           destroyExportClone(exportStage);
           downloadButton.disabled = false;

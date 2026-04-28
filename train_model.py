@@ -25,8 +25,10 @@ from utils.crop_features import (
     CATEGORICAL_FEATURE_COLUMNS,
     FEATURE_COLUMNS,
     FEATURE_DISPLAY_NAMES,
+    INPUT_FEATURE_COLUMNS,
     NEW_MAHARASHTRA_CROPS,
     NUMERIC_FEATURE_COLUMNS,
+    RAW_NUMERIC_FEATURE_COLUMNS,
     REGION_COLUMN,
     REGION_VALUE,
     TARGET_COLUMN,
@@ -40,7 +42,7 @@ from utils.maharashtra_dataset import ROWS_PER_CROP_DEFAULT, save_balanced_mahar
 RANDOM_STATE = 42
 
 BASE_DIR = Path(__file__).resolve().parent
-DATASET_PATH = BASE_DIR / "Data" / "crop_recommendation.csv"
+DATASET_PATH = BASE_DIR / "Data" / "crop_recommendation_merged_maharashtra.csv"
 MODELS_DIR = BASE_DIR / "models"
 
 MODEL_PATH = MODELS_DIR / "model.pkl"
@@ -88,12 +90,12 @@ def load_dataset(dataset_path):
 
     dataset = ensure_context_columns(dataset)
 
-    required_columns = NUMERIC_FEATURE_COLUMNS + [TARGET_COLUMN, REGION_COLUMN] + CATEGORICAL_FEATURE_COLUMNS
+    required_columns = RAW_NUMERIC_FEATURE_COLUMNS + [TARGET_COLUMN, REGION_COLUMN] + CATEGORICAL_FEATURE_COLUMNS
     missing_columns = [column for column in required_columns if column not in dataset.columns]
     if missing_columns:
         raise ValueError("Dataset is missing required columns: {0}".format(", ".join(missing_columns)))
 
-    for column in NUMERIC_FEATURE_COLUMNS:
+    for column in RAW_NUMERIC_FEATURE_COLUMNS:
         dataset[column] = pd.to_numeric(dataset[column], errors="coerce")
 
     return dataset
@@ -102,7 +104,7 @@ def load_dataset(dataset_path):
 def fill_missing_values(dataset):
     filled_dataset = dataset.copy()
 
-    for column in NUMERIC_FEATURE_COLUMNS:
+    for column in RAW_NUMERIC_FEATURE_COLUMNS:
         filled_dataset[column] = filled_dataset[column].fillna(filled_dataset[column].median())
 
     for column in CATEGORICAL_FEATURE_COLUMNS:
@@ -115,9 +117,24 @@ def fill_missing_values(dataset):
     return ensure_context_columns(filled_dataset)
 
 
+def winsorize_numeric_features_by_crop(dataset, lower_quantile=0.01, upper_quantile=0.99):
+    clipped_dataset = dataset.copy()
+    for column in RAW_NUMERIC_FEATURE_COLUMNS:
+        clipped_dataset[column] = clipped_dataset[column].astype(float)
+
+    for crop_name, crop_rows in clipped_dataset.groupby(TARGET_COLUMN):
+        crop_index = crop_rows.index
+        for column in RAW_NUMERIC_FEATURE_COLUMNS:
+            lower_bound = float(crop_rows[column].quantile(lower_quantile))
+            upper_bound = float(crop_rows[column].quantile(upper_quantile))
+            clipped_dataset.loc[crop_index, column] = crop_rows[column].clip(lower=lower_bound, upper=upper_bound)
+
+    return clipped_dataset
+
+
 def build_outlier_summary(dataset):
     summary = OrderedDict()
-    for column in NUMERIC_FEATURE_COLUMNS:
+    for column in RAW_NUMERIC_FEATURE_COLUMNS:
         series = dataset[column].astype(float)
         q1 = float(series.quantile(0.25))
         q3 = float(series.quantile(0.75))
@@ -145,6 +162,7 @@ def audit_and_clean_dataset(dataset, dataset_path):
     missing_values_by_column = {column: int(value) for column, value in dataset.isna().sum().items()}
 
     cleaned_dataset = fill_missing_values(dataset)
+    cleaned_dataset = winsorize_numeric_features_by_crop(cleaned_dataset)
     cleaned_dataset = cleaned_dataset.drop_duplicates().reset_index(drop=True)
 
     class_counts = cleaned_dataset[TARGET_COLUMN].value_counts().sort_index()
@@ -182,7 +200,7 @@ def audit_and_clean_dataset(dataset, dataset_path):
             "mean": round(float(cleaned_dataset[column].mean()), 6),
             "std": round(float(cleaned_dataset[column].std(ddof=0)), 6),
         }
-        for column in NUMERIC_FEATURE_COLUMNS
+        for column in RAW_NUMERIC_FEATURE_COLUMNS
     }
     quality_report["context_distribution"] = {
         REGION_COLUMN: cleaned_dataset[REGION_COLUMN].value_counts().sort_index().to_dict(),
@@ -191,6 +209,12 @@ def audit_and_clean_dataset(dataset, dataset_path):
         "water_availability": cleaned_dataset["water_availability"].value_counts().sort_index().to_dict(),
     }
     quality_report["outlier_summary_iqr"] = build_outlier_summary(cleaned_dataset)
+    quality_report["winsorization"] = {
+        "enabled": True,
+        "lower_quantile": 0.01,
+        "upper_quantile": 0.99,
+        "applied_per_crop": True,
+    }
     quality_report["new_crops_added"] = [crop for crop in NEW_MAHARASHTRA_CROPS if crop in set(class_counts.index)]
 
     return cleaned_dataset, class_distribution_df, quality_report
@@ -346,9 +370,204 @@ def build_candidates(num_classes):
                         "early_stopping_rounds": 30,
                     },
                 },
+                {
+                    "name": "xgboost_multiclass_v3",
+                    "model_type": "XGBClassifier",
+                    "params": {
+                        "objective": "multi:softprob",
+                        "num_class": num_classes,
+                        "n_estimators": 800,
+                        "learning_rate": 0.04,
+                        "max_depth": 6,
+                        "min_child_weight": 3,
+                        "subsample": 0.9,
+                        "colsample_bytree": 0.9,
+                        "reg_lambda": 2.0,
+                        "reg_alpha": 0.2,
+                        "gamma": 0.0,
+                        "eval_metric": "mlogloss",
+                        "tree_method": "hist",
+                        "random_state": RANDOM_STATE,
+                        "n_jobs": 1,
+                        "early_stopping_rounds": 30,
+                    },
+                },
+                {
+                    "name": "xgboost_multiclass_v4",
+                    "model_type": "XGBClassifier",
+                    "params": {
+                        "objective": "multi:softprob",
+                        "num_class": num_classes,
+                        "n_estimators": 1000,
+                        "learning_rate": 0.025,
+                        "max_depth": 9,
+                        "min_child_weight": 1,
+                        "subsample": 0.9,
+                        "colsample_bytree": 0.75,
+                        "reg_lambda": 1.2,
+                        "reg_alpha": 0.0,
+                        "gamma": 0.1,
+                        "eval_metric": "mlogloss",
+                        "tree_method": "hist",
+                        "random_state": RANDOM_STATE,
+                        "n_jobs": 1,
+                        "early_stopping_rounds": 30,
+                    },
+                },
+                {
+                    "name": "xgboost_multiclass_v16",
+                    "model_type": "XGBClassifier",
+                    "params": {
+                        "objective": "multi:softprob",
+                        "num_class": num_classes,
+                        "n_estimators": 850,
+                        "learning_rate": 0.045,
+                        "max_depth": 4,
+                        "min_child_weight": 1,
+                        "subsample": 0.98,
+                        "colsample_bytree": 0.95,
+                        "reg_lambda": 1.0,
+                        "reg_alpha": 0.0,
+                        "gamma": 0.0,
+                        "eval_metric": "mlogloss",
+                        "tree_method": "hist",
+                        "random_state": RANDOM_STATE,
+                        "n_jobs": 1,
+                        "early_stopping_rounds": 30,
+                    },
+                },
+                {
+                    "name": "xgboost_multiclass_v28",
+                    "model_type": "XGBClassifier",
+                    "params": {
+                        "objective": "multi:softprob",
+                        "num_class": num_classes,
+                        "n_estimators": 900,
+                        "learning_rate": 0.05,
+                        "max_depth": 3,
+                        "min_child_weight": 1,
+                        "subsample": 1.0,
+                        "colsample_bytree": 0.98,
+                        "reg_lambda": 1.0,
+                        "reg_alpha": 0.02,
+                        "gamma": 0.0,
+                        "eval_metric": "mlogloss",
+                        "tree_method": "hist",
+                        "random_state": RANDOM_STATE,
+                        "n_jobs": 1,
+                        "early_stopping_rounds": 30,
+                    },
+                },
             ]
         )
 
+    return candidates
+
+
+def build_candidate_signature(candidate):
+    return candidate["model_type"], tuple(sorted(candidate["params"].items()))
+
+
+def build_xgboost_search_candidates(num_classes, search_rounds, seen_signatures=None):
+    if XGBClassifier is None or search_rounds <= 0:
+        return []
+
+    seen_signatures = set() if seen_signatures is None else set(seen_signatures)
+    rng = np.random.default_rng(RANDOM_STATE)
+    seed_params = [
+        {
+            "n_estimators": 900,
+            "learning_rate": 0.05,
+            "max_depth": 3,
+            "min_child_weight": 1,
+            "subsample": 1.0,
+            "colsample_bytree": 0.98,
+            "reg_lambda": 1.0,
+            "reg_alpha": 0.02,
+            "gamma": 0.0,
+        },
+        {
+            "n_estimators": 850,
+            "learning_rate": 0.045,
+            "max_depth": 4,
+            "min_child_weight": 1,
+            "subsample": 0.98,
+            "colsample_bytree": 0.95,
+            "reg_lambda": 1.0,
+            "reg_alpha": 0.0,
+            "gamma": 0.0,
+        },
+        {
+            "n_estimators": 650,
+            "learning_rate": 0.03,
+            "max_depth": 7,
+            "min_child_weight": 2,
+            "subsample": 0.85,
+            "colsample_bytree": 0.8,
+            "reg_lambda": 1.2,
+            "reg_alpha": 0.0,
+            "gamma": 0.0,
+        },
+    ]
+
+    parameter_space = {
+        "n_estimators": [700, 800, 900, 1000, 1200],
+        "learning_rate": [0.03, 0.035, 0.04, 0.045, 0.05, 0.055, 0.06],
+        "max_depth": [2, 3, 4, 5],
+        "min_child_weight": [1, 2, 3],
+        "subsample": [0.85, 0.9, 0.95, 1.0],
+        "colsample_bytree": [0.8, 0.85, 0.9, 0.95, 1.0],
+        "reg_lambda": [0.8, 1.0, 1.2, 1.5],
+        "reg_alpha": [0.0, 0.02, 0.05, 0.1],
+        "gamma": [0.0, 0.05, 0.1],
+    }
+
+    search_candidates = []
+    max_attempts = max(search_rounds * 6, 12)
+    attempts = 0
+
+    while len(search_candidates) < search_rounds and attempts < max_attempts:
+        seed = seed_params[attempts % len(seed_params)].copy()
+        attempts += 1
+
+        params = seed.copy()
+        for key, values in parameter_space.items():
+            params[key] = rng.choice(values).item()
+
+        candidate = {
+            "name": "xgboost_search_{0}".format(len(search_candidates) + 1),
+            "model_type": "XGBClassifier",
+            "params": {
+                "objective": "multi:softprob",
+                "num_class": num_classes,
+                "eval_metric": "mlogloss",
+                "tree_method": "hist",
+                "random_state": RANDOM_STATE,
+                "n_jobs": 1,
+                "early_stopping_rounds": 30,
+                **params,
+            },
+        }
+        signature = build_candidate_signature(candidate)
+        if signature in seen_signatures:
+            continue
+
+        seen_signatures.add(signature)
+        search_candidates.append(candidate)
+
+    return search_candidates
+
+
+def build_model_candidates(num_classes, xgb_search_rounds=6):
+    candidates = build_candidates(num_classes)
+    seen_signatures = {build_candidate_signature(candidate) for candidate in candidates}
+    candidates.extend(
+        build_xgboost_search_candidates(
+            num_classes=num_classes,
+            search_rounds=xgb_search_rounds,
+            seen_signatures=seen_signatures,
+        )
+    )
     return candidates
 
 
@@ -440,12 +659,12 @@ def save_text(path_obj, text):
         file_obj.write(text)
 
 
-def train_and_save(dataset_path=DATASET_PATH):
+def train_and_save(dataset_path=DATASET_PATH, xgb_search_rounds=6):
     ensure_output_dir()
     dataset = load_dataset(dataset_path)
     cleaned_dataset, class_distribution_df, quality_report = audit_and_clean_dataset(dataset, dataset_path)
 
-    X = cleaned_dataset[FEATURE_COLUMNS].copy()
+    X = cleaned_dataset[INPUT_FEATURE_COLUMNS].copy()
     y = cleaned_dataset[TARGET_COLUMN].copy()
 
     label_encoder = LabelEncoder()
@@ -476,18 +695,35 @@ def train_and_save(dataset_path=DATASET_PATH):
     print("Imbalance ratio:", quality_report["class_balance"]["imbalance_ratio"])
 
     candidate_runs = []
-    print("\nModel comparison started...\n")
+    failed_candidates = []
+    model_candidates = build_model_candidates(len(class_names), xgb_search_rounds=xgb_search_rounds)
 
-    for candidate in build_candidates(len(class_names)):
+    print("\nModel comparison started...\n")
+    print("Candidate count:", len(model_candidates))
+    print("Dynamic XGBoost search rounds:", int(xgb_search_rounds))
+
+    for candidate in model_candidates:
         print("Training:", candidate["name"])
-        model, validation_metrics, summary = fit_candidate(
-            candidate,
-            X_train_scaled,
-            y_train,
-            X_val_scaled,
-            y_val,
-            class_names,
-        )
+        try:
+            model, validation_metrics, summary = fit_candidate(
+                candidate,
+                X_train_scaled,
+                y_train,
+                X_val_scaled,
+                y_val,
+                class_names,
+            )
+        except Exception as exc:
+            failed_candidates.append(
+                {
+                    "model_name": candidate["name"],
+                    "model_type": candidate["model_type"],
+                    "error": str(exc),
+                }
+            )
+            print("  skipped due to training error:", exc)
+            continue
+
         summary["validation_report"] = validation_metrics["classification_report"]
         candidate_runs.append(
             {
@@ -503,6 +739,9 @@ def train_and_save(dataset_path=DATASET_PATH):
                 summary["validation_top_3_accuracy"],
             )
         )
+
+    if not candidate_runs:
+        raise RuntimeError("No model candidates trained successfully.")
 
     leaderboard = [run["summary"] for run in candidate_runs]
     best_summary = choose_best_candidate(leaderboard)
@@ -526,12 +765,13 @@ def train_and_save(dataset_path=DATASET_PATH):
         ascending=False,
     ).reset_index(drop=True)
     confusion_df = pd.DataFrame(final_test_metrics["confusion_matrix"], index=class_names, columns=class_names)
-    feature_reference = build_feature_reference(X_train_full)
+    feature_reference = build_feature_reference(encode_feature_frame(X_train_full))
 
     metadata = OrderedDict()
     metadata["dataset_path"] = str(dataset_path)
     metadata["region"] = REGION_VALUE
     metadata["feature_columns"] = FEATURE_COLUMNS
+    metadata["input_feature_columns"] = INPUT_FEATURE_COLUMNS
     metadata["feature_display_names"] = FEATURE_DISPLAY_NAMES
     metadata["target_column"] = TARGET_COLUMN
     metadata["class_names"] = class_names
@@ -540,6 +780,7 @@ def train_and_save(dataset_path=DATASET_PATH):
     metadata["uses_scaler"] = True
     metadata["feature_reference"] = feature_reference
     metadata["rows_per_crop_target"] = ROWS_PER_CROP_DEFAULT
+    metadata["xgboost_search_rounds"] = int(xgb_search_rounds)
     metadata["split_summary"] = {
         "train_rows": int(len(X_train_full)),
         "test_rows": int(len(X_test)),
@@ -551,6 +792,9 @@ def train_and_save(dataset_path=DATASET_PATH):
     evaluation_payload["selected_model"] = metadata["selected_model_name"]
     evaluation_payload["selected_model_type"] = metadata["selected_model_type"]
     evaluation_payload["selection_metric"] = "validation_f1_weighted_then_validation_accuracy"
+    evaluation_payload["candidate_count"] = int(len(leaderboard))
+    evaluation_payload["xgboost_search_rounds"] = int(xgb_search_rounds)
+    evaluation_payload["failed_candidates"] = failed_candidates
     evaluation_payload["candidate_leaderboard"] = leaderboard
     evaluation_payload["test_metrics"] = OrderedDict(
         [
@@ -622,6 +866,12 @@ def parse_args():
         default=RANDOM_STATE,
         help="Random seed used for dataset refresh.",
     )
+    parser.add_argument(
+        "--xgb-search-rounds",
+        type=int,
+        default=6,
+        help="Number of additional deterministic XGBoost search candidates to evaluate.",
+    )
     return parser.parse_args()
 
 
@@ -637,7 +887,10 @@ def main():
             existing_dataset_path=dataset_path,
         )
 
-    results = train_and_save(dataset_path=dataset_path)
+    results = train_and_save(
+        dataset_path=dataset_path,
+        xgb_search_rounds=max(0, int(args.xgb_search_rounds)),
+    )
     print("\nTraining complete:", results)
 
 
